@@ -1,0 +1,80 @@
+<!-- pages/ai.html -->
+<div>
+    <h1 class="text-3xl md:text-4xl font-bold mb-6 flex gap-3 items-center">
+        <i class="fas fa-comment-dots text-green-600"></i>
+        <span data-i18n="ai_title">AI Собеседник</span>
+        <span id="aiLevelBadge" class="ml-auto text-sm font-semibold bg-green-100 text-green-700 px-3 py-1 rounded-full hidden">A1</span>
+    </h1>
+
+    <div class="grid lg:grid-cols-3 gap-6">
+
+        <!-- Левая колонка -->
+        <div class="lg:col-span-1 space-y-4">
+
+            <div class="bg-white rounded-2xl p-5 shadow-soft">
+                <h3 class="font-bold text-lg mb-3" data-i18n="scenarios">Сценарии</h3>
+                <div id="scenarioList" class="space-y-1"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 shadow-soft">
+                <h3 class="font-bold text-base mb-3">💡 Подсказки</h3>
+                <div id="levelHints" class="space-y-2 text-sm text-gray-600">
+                    <p>Начните с приветствия!</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 shadow-soft">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-base" data-i18n="history">История</h3>
+                    <button id="loadHistoryBtn" class="text-xs text-green-600 hover:underline">Загрузить</button>
+                </div>
+                <div id="historyList" class="text-sm text-gray-500 space-y-2 max-h-48 overflow-y-auto custom-scroll"></div>
+            </div>
+        </div>
+
+        <!-- Чат -->
+        <div class="lg:col-span-2 bg-white rounded-2xl shadow-soft flex flex-col" style="height:560px;">
+
+            <div class="flex items-center gap-3 px-5 py-4 border-b">
+                <div class="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-robot text-green-600"></i>
+                </div>
+                <div>
+                    <p class="font-semibold text-sm" id="chatScenarioTitle">☕ Кафе</p>
+                    <p class="text-xs text-green-500 flex items-center gap-1">
+                        <span class="w-2 h-2 bg-green-400 rounded-full inline-block animate-pulse"></span>
+                        Claude AI
+                    </p>
+                </div>
+                <button id="clearChatBtn" class="ml-auto text-xs text-gray-400 hover:text-red-400 transition">
+                    <i class="fas fa-trash-alt"></i> Очистить
+                </button>
+            </div>
+
+            <div id="chatMessages" class="flex-1 overflow-y-auto p-5 space-y-3 custom-scroll"></div>
+
+            <div id="errorAnalysisBar" class="hidden px-5 py-2 bg-amber-50 border-t border-amber-100 text-sm text-amber-800 flex items-center gap-2">
+                <i class="fas fa-pencil-alt text-amber-500"></i>
+                <span id="errorAnalysisText"></span>
+            </div>
+
+            <div class="border-t p-4 bg-gray-50 rounded-b-2xl">
+                <div class="flex gap-3">
+                    <input type="text" id="chatInput"
+                           placeholder="Напишите сообщение на изучаемом языке..."
+                           class="flex-1 border-0 bg-white rounded-xl px-4 py-3 shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none text-sm">
+                    <button id="sendChatBtn" class="bg-green-500 text-white px-5 rounded-xl hover:bg-green-600 transition">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                    <button id="voiceBtn" class="bg-gray-100 px-4 rounded-xl hover:bg-gray-200 transition text-gray-500">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400 mt-2 text-center">
+                    Enter для отправки · Ответы генерирует Claude AI
+                </p>
+            </div>
+        </div>
+
+    </div>
+</div>

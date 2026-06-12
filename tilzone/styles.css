@@ -1,0 +1,180 @@
+/* styles.css - полная версия, без сокращений */
+
+/* Глобальные стили */
+body {
+    background: linear-gradient(145deg, #fafcff 0%, #eef6ee 100%);
+    font-family: 'Inter', sans-serif;
+}
+
+/* Контейнер с отступами для разных экранов */
+.container-custom {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .container-custom {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}
+
+/* Линии между уроками в пути обучения */
+.learning-line {
+    width: 3px;
+    height: 48px;
+    background: #e2e8f0;
+    transition: background 0.3s;
+}
+
+@media (min-width: 768px) {
+    .learning-line {
+        width: 56px;
+        height: 3px;
+    }
+}
+
+.learning-line.completed {
+    background: #22c55e;
+}
+
+/* Анимация доступного урока */
+@keyframes softPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(34,197,94,0.4);
+    }
+    50% {
+        transform: scale(1.03);
+        box-shadow: 0 0 0 10px rgba(34,197,94,0);
+    }
+}
+
+.lesson-available {
+    animation: softPulse 2s infinite;
+}
+
+/* Стили для ячеек ввода кода подтверждения */
+.code-digit {
+    width: 3.5rem;
+    height: 4rem;
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    border-radius: 1rem;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+}
+
+.code-digit:focus {
+    outline: none;
+    border-color: #22c55e;
+    ring: 2px solid #22c55e;
+}
+
+/* Анимация появления страниц */
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-transition {
+    animation: fadeUp 0.35s ease-out;
+}
+
+/* Активные табы профиля */
+.profile-tab {
+    border-bottom: 2px solid transparent;
+    transition: 0.2s;
+    cursor: pointer;
+}
+
+.profile-tab.active {
+    border-bottom-color: #22c55e;
+    color: #166534;
+    font-weight: 600;
+}
+
+/* Активная кнопка нижней навигации */
+.bottom-nav-item.active {
+    color: #22c55e;
+    background: #dcfce7;
+}
+
+/* Прогресс XP с плавностью */
+.xp-progress {
+    transition: width 0.5s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+}
+
+/* Карточка оценки (hover-эффект) */
+.score-card {
+    transition: all 0.2s;
+}
+
+.score-card:hover {
+    transform: translateY(-2px);
+}
+
+/* Скелетон для загрузки */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Кастомный скролл для контейнеров с горизонтальной прокруткой */
+.custom-scroll::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+    background: #e4e4e7;
+    border-radius: 10px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+    background: #22c55e;
+    border-radius: 10px;
+}
+
+/* Адаптивность для кругов обучения на мобильных (меньше отступы) */
+@media (max-width: 640px) {
+    .learning-line {
+        height: 32px;
+    }
+    .learning-node {
+        width: 3rem;
+        height: 3rem;
+        font-size: 1.25rem;
+    }
+}
+
+/* Стили для модалок теории */
+#theoryModal .prose {
+    max-width: none;
+}
+
+/* Для формы верификации автоматический фокус */
+.code-digit:focus-visible {
+    outline: none;
+    ring: 2px solid #22c55e;
+}

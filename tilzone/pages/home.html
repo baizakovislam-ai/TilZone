@@ -1,0 +1,60 @@
+<!-- pages/home.html -->
+<div class="space-y-10">
+    <!-- Статистика -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl p-6 shadow-soft border border-green-50 flex items-center gap-5">
+            <div class="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-fire text-orange-500 text-2xl"></i>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm font-medium" data-i18n="streak_label">Дней подряд</p>
+                <p class="text-4xl font-black" id="streakValue">0</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl p-6 shadow-soft border border-green-50 flex items-center gap-5">
+            <div class="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center">
+                <i class="fas fa-calendar-check text-emerald-600 text-2xl"></i>
+            </div>
+            <div>
+                <p class="text-gray-500 text-sm font-medium" data-i18n="daily_label">Ежедневные задания</p>
+                <p class="text-xl font-bold" id="dailyProgress">— / —</p>
+                <div class="w-36 h-1.5 bg-gray-100 rounded-full mt-1">
+                    <div id="dailyBar" class="bg-green-500 h-full rounded-full transition-all" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 shadow-soft">
+            <p class="text-gray-600 text-sm font-medium" data-i18n="xp_label">Всего XP</p>
+            <p class="text-4xl font-black" id="xpValue">0</p>
+            <div class="h-2 bg-gray-200 rounded-full mt-3">
+                <div id="xpBar" class="xp-progress h-2 bg-green-500 rounded-full" style="width:0%"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                <span data-i18n="level_label">Уровень</span>
+                <span id="levelValue" class="font-semibold">1</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Путь обучения -->
+    <div>
+        <h2 class="text-2xl md:text-3xl font-bold flex items-center gap-3 mb-6">
+            <i class="fas fa-map text-green-600 text-2xl"></i>
+            <span data-i18n="learning_path_title">Путь обучения</span>
+        </h2>
+        <div id="learningPathContainer" class="bg-white/60 rounded-3xl p-6 shadow-soft overflow-x-auto custom-scroll">
+            <div class="text-center py-8 text-gray-400">
+                <i class="fas fa-spinner fa-spin text-3xl"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Оценки уроков -->
+    <div>
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+            <i class="fas fa-chart-simple text-green-600"></i>
+            <span data-i18n="scores_title">Оценки за уроки</span>
+        </h2>
+        <div id="scoresGrid" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-10 gap-3"></div>
+    </div>
+</div>

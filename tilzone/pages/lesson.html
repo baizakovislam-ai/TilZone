@@ -1,0 +1,50 @@
+<!-- pages/lesson.html — динамически заполняется через initLessonPage() -->
+<div class="max-w-2xl mx-auto space-y-6">
+
+    <!-- Заголовок урока -->
+    <div class="flex items-center gap-4">
+        <button id="backToHomeBtn" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition">
+            <i class="fas fa-arrow-left text-gray-600"></i>
+        </button>
+        <div>
+            <p class="text-xs text-gray-400 uppercase tracking-wide" id="lessonLevel">A1</p>
+            <h1 class="text-2xl font-bold" id="lessonTitle">Загрузка...</h1>
+        </div>
+        <div class="ml-auto text-right">
+            <span class="text-xs text-gray-400">Награда</span>
+            <p class="font-bold text-green-600" id="lessonXpReward">+20 XP</p>
+        </div>
+    </div>
+
+    <!-- Прогресс-бар заданий -->
+    <div>
+        <div class="flex justify-between text-sm text-gray-500 mb-1">
+            <span>Прогресс</span>
+            <span id="taskProgressLabel">0 / 0</span>
+        </div>
+        <div class="h-2.5 bg-gray-100 rounded-full">
+            <div id="taskProgressBar" class="h-full bg-green-500 rounded-full transition-all" style="width:0%"></div>
+        </div>
+    </div>
+
+    <!-- Карточка задания -->
+    <div id="taskCard" class="bg-white rounded-3xl p-8 shadow-soft min-h-[280px] flex flex-col justify-between">
+        <div class="text-center py-12">
+            <i class="fas fa-spinner fa-spin text-4xl text-green-400"></i>
+        </div>
+    </div>
+
+    <!-- Кнопки навигации -->
+    <div class="flex gap-3 justify-end">
+        <button id="prevTaskBtn" class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition hidden">
+            <i class="fas fa-chevron-left mr-1"></i> Назад
+        </button>
+        <button id="nextTaskBtn" class="px-6 py-2.5 rounded-xl bg-green-500 text-white font-medium hover:bg-green-600 transition hidden">
+            Далее <i class="fas fa-chevron-right ml-1"></i>
+        </button>
+        <button id="completeBtn" class="px-6 py-2.5 rounded-xl bg-amber-500 text-white font-medium hover:bg-amber-600 transition hidden">
+            🏁 Завершить урок
+        </button>
+    </div>
+
+</div>

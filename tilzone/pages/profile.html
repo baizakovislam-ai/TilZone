@@ -1,0 +1,48 @@
+<!-- pages/profile.html -->
+<div class="max-w-4xl mx-auto space-y-6">
+
+    <!-- Карточка пользователя -->
+    <div class="bg-white rounded-3xl p-6 shadow-soft flex flex-col md:flex-row gap-6 items-center md:items-start">
+
+        <!-- Аватар с кнопкой смены -->
+        <div class="relative group flex-shrink-0">
+            <div id="avatarWrapper" class="w-28 h-28 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center text-5xl overflow-hidden cursor-pointer">
+                <i id="avatarIcon" class="fas fa-user-astronaut text-green-700"></i>
+            </div>
+            <label for="avatarInput" class="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                <i class="fas fa-camera text-white text-xl"></i>
+            </label>
+            <input type="file" id="avatarInput" accept="image/*" class="hidden">
+            <div id="avatarLoader" class="hidden absolute inset-0 rounded-full bg-white/80 flex items-center justify-center">
+                <i class="fas fa-spinner fa-spin text-green-500 text-xl"></i>
+            </div>
+        </div>
+
+        <!-- Основная информация -->
+        <div class="flex-1 text-center md:text-left">
+            <h2 id="profileName" class="text-2xl md:text-3xl font-black"></h2>
+            <p id="profileUsername" class="text-gray-500 text-lg"></p>
+            <div class="flex flex-wrap gap-3 mt-3 justify-center md:justify-start">
+                <span class="bg-amber-100 px-4 py-1.5 rounded-full text-sm"><i class="fas fa-trophy mr-1"></i><span id="profileLeague">Bronze</span></span>
+                <span class="bg-orange-100 px-4 py-1.5 rounded-full text-sm"><i class="fas fa-fire mr-1"></i><span id="profileStreak">0</span> <span data-i18n="days">дн.</span></span>
+                <span class="bg-green-100 px-4 py-1.5 rounded-full text-sm"><i class="fas fa-star mr-1"></i>XP: <span id="profileXP">0</span></span>
+            </div>
+        </div>
+
+        <button id="logoutBtn" class="bg-red-50 text-red-600 px-5 py-2 rounded-xl text-sm hover:bg-red-100 transition flex-shrink-0">
+            <i class="fas fa-sign-out-alt mr-1"></i><span data-i18n="logout">Выйти</span>
+        </button>
+    </div>
+
+    <!-- Табы -->
+    <div class="border-b border-gray-200 flex gap-6 overflow-x-auto">
+        <button data-tab="stats"        class="profile-tab py-3 px-1 font-medium text-gray-600" data-i18n="stats_tab">Статистика</button>
+        <button data-tab="edit"         class="profile-tab py-3 px-1 font-medium text-gray-600">✏️ Редактировать</button>
+        <button data-tab="achievements" class="profile-tab py-3 px-1 font-medium text-gray-600" data-i18n="achievements_tab">Достижения</button>
+        <button data-tab="rating"       class="profile-tab py-3 px-1 font-medium text-gray-600" data-i18n="rating_tab">Рейтинг</button>
+        <button data-tab="settings"     class="profile-tab py-3 px-1 font-medium text-gray-600" data-i18n="settings_tab">Настройки</button>
+    </div>
+
+    <!-- Содержимое таба -->
+    <div id="profileTabContent" class="bg-white rounded-2xl p-6 shadow-soft min-h-[300px]"></div>
+</div>

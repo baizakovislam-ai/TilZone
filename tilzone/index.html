@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>TilZone — Изучай языки с комфортом</title>
+    <!-- Tailwind CSS + Font Awesome + Google Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Кастомные стили -->
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        // Конфигурация Tailwind (для кастомных теней, скруглений)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    borderRadius: { '3xl': '1.5rem' },
+                    boxShadow: { 'soft': '0 12px 30px -8px rgba(0,0,0,0.08)' }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+
+<div id="app" class="relative flex flex-col min-h-screen">
+    <!-- Верхняя навигация (десктоп) -->
+    <nav class="hidden md:flex items-center justify-between px-6 py-4 bg-white/70 backdrop-blur-md sticky top-0 z-50 border-b border-gray-200/40 shadow-soft">
+        <div class="flex items-center gap-2">
+            <span class="text-2xl font-black bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">TilZone</span>
+            <div class="ml-10 flex gap-2">
+                <a href="#" data-page="home" class="nav-link px-5 py-2 rounded-full text-gray-700 font-medium hover:bg-green-50 transition-all">🏠 <span data-i18n="nav_home">Главная</span></a>
+                <a href="#" data-page="ai" class="nav-link px-5 py-2 rounded-full text-gray-700 font-medium hover:bg-green-50 transition-all">🤖 <span data-i18n="nav_ai">AI Собеседник</span></a>
+                <a href="#" data-page="theory" class="nav-link px-5 py-2 rounded-full text-gray-700 font-medium hover:bg-green-50 transition-all">📘 <span data-i18n="nav_theory">Теория</span></a>
+                <a href="#" data-page="mvp" class="nav-link px-5 py-2 rounded-full text-gray-700 font-medium hover:bg-green-50 transition-all">⚡ <span data-i18n="nav_mvp">MVP Режим</span></a>
+                <a href="#" data-page="profile" class="nav-link px-5 py-2 rounded-full text-gray-700 font-medium hover:bg-green-50 transition-all">👤 <span data-i18n="nav_profile">Профиль</span></a>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <!-- Выбор языка интерфейса -->
+            <div class="relative">
+                <button id="langBtn" class="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-full text-sm font-medium"><i class="fas fa-globe"></i> <span id="currentLangLabel">Кыргызча</span> <i class="fas fa-chevron-down text-xs"></i></button>
+                <div id="langDropdown" class="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-lg hidden z-50 border">
+                    <div data-lang="ky" class="lang-option px-4 py-2 hover:bg-green-50 cursor-pointer rounded-t-xl">🇰🇬 Кыргызча</div>
+                    <div data-lang="en" class="lang-option px-4 py-2 hover:bg-green-50 cursor-pointer">🇬🇧 English</div>
+                    <div data-lang="ru" class="lang-option px-4 py-2 hover:bg-green-50 cursor-pointer rounded-b-xl">🇷🇺 Русский</div>
+                </div>
+            </div>
+            <div id="authButtonsDesktop" class="flex items-center gap-3"></div>
+        </div>
+    </nav>
+
+    <!-- Нижняя навигация (мобильная) -->
+    <div class="md:hidden fixed bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-gray-100 flex justify-around py-2 z-50">
+        <a href="#" data-page="home" class="bottom-nav-item flex flex-col items-center py-2 px-3 rounded-xl text-gray-500"><i class="fas fa-home text-xl"></i><span class="text-[11px] mt-0.5" data-i18n="nav_home">Главная</span></a>
+        <a href="#" data-page="ai" class="bottom-nav-item flex flex-col items-center py-2 px-3 rounded-xl text-gray-500"><i class="fas fa-robot text-xl"></i><span class="text-[11px] mt-0.5" data-i18n="nav_ai">AI</span></a>
+        <a href="#" data-page="theory" class="bottom-nav-item flex flex-col items-center py-2 px-3 rounded-xl text-gray-500"><i class="fas fa-book text-xl"></i><span class="text-[11px] mt-0.5" data-i18n="nav_theory">Теория</span></a>
+        <a href="#" data-page="mvp" class="bottom-nav-item flex flex-col items-center py-2 px-3 rounded-xl text-gray-500"><i class="fas fa-bolt text-xl"></i><span class="text-[11px] mt-0.5" data-i18n="nav_mvp">MVP</span></a>
+        <a href="#" data-page="profile" class="bottom-nav-item flex flex-col items-center py-2 px-3 rounded-xl text-gray-500"><i class="fas fa-user text-xl"></i><span class="text-[11px] mt-0.5" data-i18n="nav_profile">Профиль</span></a>
+    </div>
+
+    <!-- Динамический контент (страницы подгружаются сюда) -->
+    <main id="app-content" class="flex-1 pb-28 md:pb-8 pt-6 md:pt-8">
+        <div class="container-custom">
+            <!-- Сюда будет загружена HTML страницы через script.js -->
+        </div>
+    </main>
+</div>
+
+<!-- Модальное окно для неавторизованных (гостей) -->
+<div id="authModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-[100] p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 text-center">
+        <i class="fas fa-lock text-6xl text-green-500 mb-4"></i>
+        <h3 class="text-2xl font-bold mb-2" data-i18n="auth_title">Для продолжения войдите</h3>
+        <div class="flex flex-col gap-3 mt-6">
+            <button id="modalLoginBtn" class="bg-green-500 text-white py-3 rounded-xl font-semibold" data-i18n="login_btn">Войти</button>
+            <button id="modalRegisterBtn" class="border py-3 rounded-xl" data-i18n="register_btn">Зарегистрироваться</button>
+        </div>
+    </div>
+</div>
+
+<!-- Подключаем основной скрипт (логика SPA, авторизация, рендер) -->
+<script src="script.js"></script>
+</body>
+</html>
