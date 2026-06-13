@@ -9,11 +9,18 @@ from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
 
+# auto_error=False — не бросает 401 при отсутствии токена
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl="/v1/auth/login",
+    auto_error=False,
+)
+
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    """Обязательная авторизация — 401 если токен отсутствует или невалиден."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail={
@@ -25,7 +32,6 @@ async def get_current_user(
         },
         headers={"WWW-Authenticate": "Bearer"},
     )
-
     try:
         payload = decode_token(token)
         if payload.get("type") != "access":
@@ -36,23 +42,42 @@ async def get_current_user(
     except Exception:
         raise credentials_exception
 
-    stmt = select(User).where(User.id == user_id)
-    result = await db.execute(stmt)
+    result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if user is None:
         raise credentials_exception
-
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "error": {
-                    "code": "user_inactive",
-                    "message": "Пользователь деактивирован",
-                    "details": {},
-                }
-            },
+            detail={"error": {"code": "user_inactive", "message": "Пользователь деактивирован", "details": {}}},
         )
+    return user
 
+
+async def get_optional_user(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """
+    Опциональная авторизация — возвращает User или None.
+    Никогда не бросает 401. Используется в GET /lessons, /leaderboard и т.д.
+    """
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        if payload.get("type") != "access":
+            return None
+        user_id: str | None = payload.get("sub")
+        if not user_id:
+            return None
+    except Exception:
+        return None
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        return None
     return user

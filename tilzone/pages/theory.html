@@ -1,19 +1,79 @@
-<!-- pages/theory.html -->
+<!-- pages/theory.html — ID соответствуют script.js -->
 <div>
-    <h1 class="text-3xl md:text-4xl font-bold mb-6 flex gap-2">
+  <!-- Заголовок -->
+  <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-3xl md:text-4xl font-black flex items-center gap-3">
         <i class="fas fa-graduation-cap text-green-600"></i>
-        <span data-i18n="theory_title">Теория</span>
-    </h1>
-    <div id="theoryCategories" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        <span>Теория</span>
+      </h1>
+      <p class="text-gray-500 mt-1 text-sm">Грамматика и правила английского языка</p>
+    </div>
+    <div class="sm:ml-auto flex gap-2 flex-wrap" id="categoryFilters"></div>
+  </div>
+
+  <!-- Поиск -->
+  <div class="relative mb-6">
+    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+    <input type="text" id="theorySearch"
+           placeholder="Темани издөө..."
+           class="w-full pl-11 pr-4 py-3 bg-white rounded-2xl border border-gray-100 shadow-soft
+                  focus:outline-none focus:ring-2 focus:ring-green-400 text-sm">
+  </div>
+
+  <!-- Загрузка -->
+  <div id="theoryLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div class="skeleton rounded-2xl h-44"></div>
+    <div class="skeleton rounded-2xl h-44"></div>
+    <div class="skeleton rounded-2xl h-44"></div>
+  </div>
+
+  <!-- Грид теории -->
+  <div id="theoryGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+
+  <!-- Пусто -->
+  <div id="theoryEmpty" class="hidden text-center py-16 text-gray-400">
+    <i class="fas fa-book-open text-5xl mb-3 block"></i>
+    <p class="font-medium">Эч нерсе табылган жок</p>
+    <p class="text-sm mt-1">Башка категорияны тандаңыз</p>
+  </div>
 </div>
 
-<!-- Модальное окно для детального отображения теории (скрыто по умолчанию) -->
-<div id="theoryModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-white max-w-2xl w-full rounded-3xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
-        <div class="flex justify-between items-center mb-4">
-            <h2 id="modalTitle" class="text-2xl font-bold"></h2>
-            <button id="closeModalBtn" class="text-3xl text-gray-400 hover:text-gray-600">&times;</button>
-        </div>
-        <div id="modalContent" class="prose prose-green max-w-none"></div>
+<!-- Модальное окно теории -->
+<div id="theoryModal"
+     class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+  <div class="bg-white max-w-2xl w-full rounded-3xl shadow-2xl max-h-[90vh] flex flex-col">
+
+    <!-- Шапка -->
+    <div class="flex items-start justify-between p-6 border-b flex-shrink-0">
+      <h2 id="theoryModalTitle" class="text-2xl font-black pr-4 leading-snug"></h2>
+      <button id="closeTheoryModal"
+              class="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center
+                     hover:bg-gray-200 transition flex-shrink-0">
+        <i class="fas fa-times text-gray-500"></i>
+      </button>
     </div>
+
+    <!-- Контент -->
+    <div class="overflow-y-auto flex-1 custom-scroll p-6">
+      <div id="theoryModalBody" class="prose prose-sm prose-green max-w-none leading-relaxed"></div>
+
+      <!-- Примеры -->
+      <div id="theoryModalExamples" class="hidden mt-5">
+        <h4 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
+          <i class="fas fa-lightbulb text-amber-400"></i> Мисалдар
+        </h4>
+        <div id="theoryModalExamplesText"
+             class="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-1.5 text-sm font-mono text-amber-900"></div>
+      </div>
+    </div>
+
+    <!-- Футер -->
+    <div class="border-t p-4 flex-shrink-0">
+      <button id="closeTheoryModal2"
+              class="w-full border py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 transition text-sm font-medium">
+        Жабуу
+      </button>
+    </div>
+  </div>
 </div>

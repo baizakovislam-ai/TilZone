@@ -43,13 +43,14 @@ async def chat(
     history = [{"role": msg.role, "content": msg.content} for msg in payload.history]
 
     try:
-        result = call_ai_chat(
+        result = await call_ai_chat(
             message=payload.message,
             scenario=payload.scenario,
             history=history,
             study_language=study_language,
             native_language=native_language,
             level=level,
+            user_id=current_user.id,
         )
     except RuntimeError as e:
         logger.error("AI service error: %s", e)

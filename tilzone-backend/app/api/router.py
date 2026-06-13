@@ -11,3 +11,5 @@ api_router.include_router(theory.router, prefix="/theory", tags=["theory"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router.include_router(pvp.router, prefix="/pvp", tags=["pvp"])
 api_router.include_router(leaderboard.router, prefix="/leaderboard", tags=["leaderboard"])
+from app.routers.pvp_ws import router as pvp_router
+api_router.include_router(pvp_router)  # без prefix — WS на /pvp/ws

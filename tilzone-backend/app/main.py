@@ -40,6 +40,8 @@ app.add_middleware(
 # Serve uploaded avatars as static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
+
 app.include_router(api_router, prefix="/v1")
 
 

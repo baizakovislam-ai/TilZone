@@ -1,29 +1,33 @@
 // ============================================================
 //  TilZone SPA — script.js
-//  Полная версия: Auth + Lessons + Profile + Leaderboard
+//  Full version: Auth + Lessons (translate/choice/fill) + Theory API + Profile
 // ============================================================
 
-const API_BASE = "http://localhost:8000/v1";
-
-// ── Глобальное состояние ─────────────────────────────────────
-let currentUser      = JSON.parse(localStorage.getItem("tilzone_user"))        || null;
-let accessToken      = localStorage.getItem("tilzone_access_token")            || null;
-let refreshToken     = localStorage.getItem("tilzone_refresh_token")           || null;
-let currentLang      = localStorage.getItem("tilzone_lang")                    || "ky";
-let currentStudyLang = localStorage.getItem("tilzone_study_lang")              || "en";
-let currentPage      = "home";
-let pendingVerifyEmail = localStorage.getItem("tilzone_pending_verify_email")  || "";
-let currentProfileTab   = "stats";
+const API_BASE = "https://5bb7-95-87-64-99.ngrok-free.app/";
+// http://localhost:8000/v1
+// ── Global state ──────────────────────────────────────────────
+let currentUser        = JSON.parse(localStorage.getItem("tilzone_user"))       || null;
+let accessToken        = localStorage.getItem("tilzone_access_token")           || null;
+let refreshToken       = localStorage.getItem("tilzone_refresh_token")          || null;
+let currentLang        = localStorage.getItem("tilzone_lang")                   || "ky";
+let currentStudyLang   = localStorage.getItem("tilzone_study_lang")             || "en";
+let currentPage        = "home";
+let pendingVerifyEmail = localStorage.getItem("tilzone_pending_verify_email")   || "";
+let currentProfileTab  = "stats";
 let currentRatingSubtab = "global";
-let timerInterval    = null;
+let timerInterval      = null;
 
-// Урок
-let activeLessonId = null;
-let lessonTasks    = [];
-let taskIndex      = 0;
-let taskAnswered   = false;
+// Lesson state
+let activeLessonId     = null;
+let lessonTasks        = [];
+let taskIndex          = 0;
+let taskAnswered       = false;
 
-// AI-чат
+// Theory state
+let allTheoryCards     = [];
+let activeTheoryCat    = "";
+
+// AI chat
 const aiScenarios = [
   { id:1, name:"☕ Кафе",        dialog:[{role:"assistant",text:"Добрый день! Что желаете заказать?"}] },
   { id:2, name:"✈️ Аэропорт",   dialog:[{role:"assistant",text:"Ваш билет, пожалуйста."}] },
@@ -33,19 +37,10 @@ const aiScenarios = [
 ];
 let currentScenario = aiScenarios[0];
 let chatHistory     = [...currentScenario.dialog];
-
-// Теория (мок)
-const theoryCategories = [
-  { slug:"tenses",   name:"Времена",  desc:"Все времена английского языка",
-    content:"<h3>Present Simple</h3><p>I work, he works...</p><ul><li>I play / I don't play</li><li>I go to school every day.</li></ul>" },
-  { slug:"verbs",    name:"Глаголы",  desc:"Правильные и неправильные глаголы",
-    content:"<h3>Неправильные глаголы</h3><ul><li>go - went - gone</li><li>see - saw - seen</li><li>take - took - taken</li></ul>" },
-  { slug:"articles", name:"Артикли",  desc:"A / An / The — употребление",
-    content:"<p><b>a</b> — перед согласными: a cat<br><b>an</b> — перед гласными: an apple<br><b>the</b> — известный объект: the sun</p>" },
-];
+let sessionErrors   = [];
 
 // ══════════════════════════════════════════════════════════════
-//  API-КЛИЕНТ
+//  API CLIENT
 // ══════════════════════════════════════════════════════════════
 
 class ApiError extends Error {
@@ -91,8 +86,7 @@ async function apiUpload(path, formData) {
   if (!res.ok) {
     let errData;
     try { errData = await res.json(); } catch { errData = {}; }
-    const message = errData?.detail?.error?.message || errData?.error?.message || errData?.detail || `HTTP ${res.status}`;
-    throw new ApiError(message, res.status, errData);
+    throw new ApiError(errData?.detail?.error?.message || `HTTP ${res.status}`, res.status, errData);
   }
   return res.json();
 }
@@ -108,7 +102,10 @@ async function tryRefreshToken() {
     if (data.access_token) {
       accessToken = data.access_token;
       localStorage.setItem("tilzone_access_token", accessToken);
-      if (data.refresh_token) { refreshToken = data.refresh_token; localStorage.setItem("tilzone_refresh_token", refreshToken); }
+      if (data.refresh_token) {
+        refreshToken = data.refresh_token;
+        localStorage.setItem("tilzone_refresh_token", refreshToken);
+      }
       return true;
     }
   } catch { /* ignore */ }
@@ -130,12 +127,12 @@ function logout() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  UI-УТИЛИТЫ
+//  UI UTILITIES
 // ══════════════════════════════════════════════════════════════
 
 function showToast(msg, type = "success") {
   document.getElementById("tilzone-toast")?.remove();
-  const colors = { success:"bg-green-500", error:"bg-red-500", info:"bg-blue-500" };
+  const colors = { success:"bg-green-500", error:"bg-red-500", info:"bg-blue-500", warn:"bg-amber-500" };
   const el = document.createElement("div");
   el.id = "tilzone-toast";
   el.className = `fixed top-5 right-5 z-[200] text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium ${colors[type]||colors.success}`;
@@ -144,8 +141,12 @@ function showToast(msg, type = "success") {
   setTimeout(() => el.remove(), 3500);
 }
 
-function setElText(id, val)      { const e = document.getElementById(id); if (e) e.innerText = String(val); }
-function setElStyle(id, prop, v) { const e = document.getElementById(id); if (e) e.style[prop] = v; }
+function setElText(id, val)       { const e = document.getElementById(id); if (e) e.innerText = String(val); }
+function setElStyle(id, prop, v)  { const e = document.getElementById(id); if (e) e.style[prop] = v; }
+function showEl(id)  { const e = document.getElementById(id); if (e) { e.classList.remove("hidden"); e.classList.add("flex"); } }
+function hideEl(id)  { const e = document.getElementById(id); if (e) { e.classList.add("hidden");    e.classList.remove("flex"); } }
+function showBlock(id) { const e = document.getElementById(id); if (e) e.classList.remove("hidden"); }
+function hideBlock(id) { const e = document.getElementById(id); if (e) e.classList.add("hidden"); }
 
 function setLoading(btnId, loading, label) {
   const btn = document.getElementById(btnId);
@@ -158,7 +159,7 @@ function showFieldError(id, msg) {
   const field = document.getElementById(id);
   if (!field) return;
   field.classList.add("border-red-400");
-  if (field.nextElementSibling?.classList.contains("field-error")) field.nextElementSibling.remove();
+  field.nextElementSibling?.classList.contains("field-error") && field.nextElementSibling.remove();
   const p = document.createElement("p");
   p.className = "field-error text-xs text-red-500 mt-1";
   p.innerText = msg;
@@ -170,11 +171,11 @@ function clearFieldErrors(scope) {
   scope?.querySelectorAll(".border-red-400").forEach(e => e.classList.remove("border-red-400"));
 }
 
-function showAuthModal() { const m = document.getElementById("authModal"); m?.classList.remove("hidden"); m?.classList.add("flex"); }
-function hideAuthModal() { const m = document.getElementById("authModal"); m?.classList.add("hidden");    m?.classList.remove("flex"); }
+function showAuthModal() { showEl("authModal"); }
+function hideAuthModal() { hideEl("authModal"); }
 
 // ══════════════════════════════════════════════════════════════
-//  ПЕРЕВОДЫ
+//  i18n
 // ══════════════════════════════════════════════════════════════
 
 const i18n = {
@@ -185,17 +186,17 @@ const i18n = {
         logout:"Чыгуу", stats_tab:"Статистика", achievements_tab:"Жетишкендиктер",
         rating_tab:"Рейтинг", settings_tab:"Орнотуулар", days:"күн",
         ai_title:"AI Сүйлөшүү", scenarios:"Сценарийлер", history:"Диалог тарыхы",
-        error_analysis:"Каталарды талдоо", theory_title:"Теория", mvp_title:"MVP Режим",
-        mvp_desc:"Жөнөкөй окуу", loading:"Жүктөлүүдө...", global:"Глобалдык", friends:"Достор", pvp:"PvP" },
+        theory_title:"Теория", mvp_title:"MVP Режим", mvp_desc:"Жөнөкөй окуу",
+        loading:"Жүктөлүүдө...", global:"Глобалдык", pvp:"PvP" },
   ru: { nav_home:"Главная", nav_ai:"AI Собеседник", nav_theory:"Теория", nav_mvp:"MVP Режим", nav_profile:"Профиль",
         streak_label:"Дней подряд", daily_label:"Ежедневные задания", xp_label:"Всего XP",
         level_label:"Уровень", learning_path_title:"Путь обучения", scores_title:"Оценки уроков",
         login_btn:"Войти", register_btn:"Регистрация", auth_title:"Для продолжения войдите",
         logout:"Выйти", stats_tab:"Статистика", achievements_tab:"Достижения",
         rating_tab:"Рейтинг", settings_tab:"Настройки", days:"дн.",
-        ai_title:"AI Собеседник", scenarios:"Сценарии", history:"История диалогов",
-        error_analysis:"Анализ ошибок", theory_title:"Теория", mvp_title:"MVP Режим",
-        mvp_desc:"Упрощённое обучение", loading:"Загрузка...", global:"Глобальный", friends:"Друзья", pvp:"PvP" },
+        ai_title:"AI Собеседник", scenarios:"Сценарии", history:"История",
+        theory_title:"Теория", mvp_title:"MVP Режим", mvp_desc:"Упрощённое обучение",
+        loading:"Загрузка...", global:"Глобальный", pvp:"PvP" },
   en: { nav_home:"Home", nav_ai:"AI Chat", nav_theory:"Theory", nav_mvp:"MVP Mode", nav_profile:"Profile",
         streak_label:"Day streak", daily_label:"Daily quests", xp_label:"Total XP",
         level_label:"Level", learning_path_title:"Learning path", scores_title:"Lesson scores",
@@ -203,8 +204,8 @@ const i18n = {
         logout:"Logout", stats_tab:"Statistics", achievements_tab:"Achievements",
         rating_tab:"Leaderboard", settings_tab:"Settings", days:"days",
         ai_title:"AI Companion", scenarios:"Scenarios", history:"History",
-        error_analysis:"Error analysis", theory_title:"Theory", mvp_title:"MVP Mode",
-        mvp_desc:"Simplified learning", loading:"Loading...", global:"Global", friends:"Friends", pvp:"PvP" },
+        theory_title:"Theory", mvp_title:"MVP Mode", mvp_desc:"Simplified learning",
+        loading:"Loading...", global:"Global", pvp:"PvP" },
 };
 
 function applyUILanguage(lang) {
@@ -212,7 +213,10 @@ function applyUILanguage(lang) {
   localStorage.setItem("tilzone_lang", lang);
   setElText("currentLangLabel", { ky:"Кыргызча", en:"English", ru:"Русский" }[lang] || lang);
   const t = i18n[lang] || i18n.ru;
-  document.querySelectorAll("[data-i18n]").forEach(el => { const k=el.getAttribute("data-i18n"); if(t[k]) el.innerText=t[k]; });
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const k = el.getAttribute("data-i18n");
+    if (t[k]) el.innerText = t[k];
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -253,7 +257,7 @@ function updateUIForAuth() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  СТРАНИЦА: LOGIN
+//  AUTH PAGES
 // ══════════════════════════════════════════════════════════════
 
 function initLoginPage() {
@@ -275,8 +279,8 @@ async function doLogin() {
     saveSession(data); updateUIForAuth(); loadPage("home");
   } catch(err) {
     const code = err.data?.detail?.error?.code || err.data?.error?.code;
-    if (code === "email_not_verified" && loginVal.includes("@")) {
-      pendingVerifyEmail = loginVal;
+    if (code === "email_not_verified") {
+      pendingVerifyEmail = loginVal.includes("@") ? loginVal : "";
       localStorage.setItem("tilzone_pending_verify_email", pendingVerifyEmail);
       showToast("Сначала подтвердите email", "info");
       loadPage("verify");
@@ -286,10 +290,6 @@ async function doLogin() {
     setLoading("doLoginBtn", false, "Войти");
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-//  СТРАНИЦА: REGISTER
-// ══════════════════════════════════════════════════════════════
 
 function initRegisterPage() {
   document.getElementById("doRegisterBtn")?.addEventListener("click", doRegister);
@@ -321,17 +321,9 @@ async function doRegister() {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-//  СТРАНИЦА: VERIFY
-// ══════════════════════════════════════════════════════════════
-
 function initVerifyPage() {
   const email = pendingVerifyEmail || currentUser?.email || "";
-  if (!email) {
-    showToast("Сначала зарегистрируйтесь, чтобы получить код", "error");
-    loadPage("register");
-    return;
-  }
+  if (!email) { showToast("Сначала зарегистрируйтесь", "error"); loadPage("register"); return; }
 
   let remaining = 30;
   const timerSpan = document.getElementById("timerText");
@@ -345,6 +337,7 @@ function initVerifyPage() {
       resendBtn?.classList.remove("hidden");
     } else { timerSpan.innerText = `Отправить повторно через ${remaining}с`; remaining--; }
   }, 1000);
+
   document.querySelectorAll(".code-digit").forEach((inp, i, arr) => {
     inp.addEventListener("input",   () => { if(inp.value && arr[i+1]) arr[i+1].focus(); });
     inp.addEventListener("keydown", e  => { if(e.key==="Backspace" && !inp.value && arr[i-1]) arr[i-1].focus(); });
@@ -376,20 +369,12 @@ async function doVerify() {
 async function resendVerificationCode() {
   const email = pendingVerifyEmail || currentUser?.email;
   if (!email) return loadPage("register");
-  setLoading("resendCodeBtn", true, "Отправить повторно");
   try {
     const data = await apiFetch("/auth/resend-verification", { method:"POST", json:{ email } });
     showToast(data.message || "Код отправлен");
     loadPage("verify");
-  } catch(err) {
-    showToast(err.message || "Не удалось отправить код", "error");
-    setLoading("resendCodeBtn", false, "Отправить повторно");
-  }
+  } catch(err) { showToast(err.message || "Не удалось отправить код", "error"); }
 }
-
-// ══════════════════════════════════════════════════════════════
-//  FORGOT / RESET
-// ══════════════════════════════════════════════════════════════
 
 function initForgotPage() {
   document.getElementById("sendResetBtn")?.addEventListener("click", async () => {
@@ -410,7 +395,7 @@ function initResetPage() {
     const newPass = document.getElementById("newPass")?.value;
     const confirm = document.getElementById("confirmNewPass")?.value;
     if (!newPass || newPass !== confirm) return showToast("Пароли не совпадают","error");
-    if (!token) return showToast("Токен не найден. Перейдите по ссылке из письма.","error");
+    if (!token) return showToast("Токен не найден","error");
     setLoading("doResetBtn",true,"Сохранить пароль");
     try {
       await apiFetch("/auth/reset-password",{ method:"POST", json:{ token, new_password:newPass, password_confirmation:confirm } });
@@ -420,7 +405,7 @@ function initResetPage() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  СТРАНИЦА: HOME
+//  HOME PAGE
 // ══════════════════════════════════════════════════════════════
 
 function initHomePage() {
@@ -441,7 +426,7 @@ async function loadLearningPath() {
     setElText("dailyProgress", `${completed} / ${total}`);
     setElStyle("dailyBar","width", total ? `${(completed/total)*100}%` : "0%");
   } catch {
-    container.innerHTML = `<p class="text-center text-gray-400 py-8">Не удалось загрузить уроки. Запущен ли сервер?</p>`;
+    container.innerHTML = `<p class="text-center text-gray-400 py-8">Уроктарды жүктөө мүмкүн болгон жок. Сервер иштеп жатабы?</p>`;
   }
 }
 
@@ -451,28 +436,38 @@ function renderLearningPath(lessons, container) {
     available: "bg-orange-400 text-white cursor-pointer shadow-lg lesson-available",
     locked:    "bg-gray-200 text-gray-400 cursor-not-allowed",
   };
-  let html = `<div class="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-6 min-w-max py-4">`;
+  let html = `<div class="flex flex-col md:flex-row items-center justify-center gap-3 md:gap-4 min-w-max py-4 flex-wrap">`;
   lessons.forEach((lesson, idx) => {
-    const icon = lesson.status==="completed" ? "✓" : lesson.status==="locked" ? "🔒" : lesson.xp_reward;
+    const icon = lesson.status==="completed" ? "✓"
+               : lesson.status==="locked"    ? "🔒"
+               : (lesson.icon || lesson.xp_reward);
     html += `
       <div class="flex flex-col items-center">
-        <div class="w-20 h-20 rounded-full flex items-center justify-center font-bold text-xl shadow-md transition-all
-                    ${statusCls[lesson.status]||statusCls.locked} learning-node"
-             data-lesson-id="${lesson.id}" data-status="${lesson.status}">${icon}</div>
-        <span class="text-xs font-medium mt-2 text-center max-w-[80px]">${lesson.title}</span>
-        ${lesson.status==="completed" ? `<span class="text-[10px] text-green-600">${lesson.score} XP</span>` : ""}
+        <div class="w-20 h-20 rounded-full flex items-center justify-center font-bold text-2xl
+                    transition-all ${statusCls[lesson.status]||statusCls.locked} learning-node"
+             data-lesson-id="${lesson.id}" data-status="${lesson.status}"
+             title="${lesson.title}">${icon}</div>
+        <span class="text-xs font-medium mt-2 text-center max-w-[80px] leading-tight">${lesson.title}</span>
+        ${lesson.status==="completed"
+          ? `<span class="text-[10px] text-green-600 font-semibold">✓ ${lesson.score} XP</span>`
+          : `<span class="text-[10px] text-gray-400">+${lesson.xp_reward} XP</span>`}
       </div>`;
-    if (idx < lessons.length-1)
+    if (idx < lessons.length - 1)
       html += `<div class="learning-line ${lesson.status==="completed"?"completed":""}"></div>`;
   });
   html += `</div>`;
   container.innerHTML = html;
+
   container.querySelectorAll(".learning-node").forEach(el => {
     el.addEventListener("click", () => {
       if (!currentUser) { showAuthModal(); return; }
       const s = el.dataset.status;
-      if (s==="available" || s==="completed") { activeLessonId = parseInt(el.dataset.lessonId); loadPage("lesson"); }
-      else showToast("🔒 Сначала пройдите предыдущий урок","error");
+      if (s === "available" || s === "completed") {
+        activeLessonId = parseInt(el.dataset.lessonId);
+        loadPage("lesson");
+      } else {
+        showToast("🔒 Алгач мурунку сабакты бүтүрүңүз","warn");
+      }
     });
   });
 }
@@ -480,53 +475,140 @@ function renderLearningPath(lessons, container) {
 function renderScores(lessons, grid) {
   if (!grid) return;
   grid.innerHTML = lessons.map(l => `
-    <div class="bg-white rounded-xl p-3 text-center shadow-sm score-card" title="${l.title}">
-      <span class="text-[10px] text-gray-500 block truncate">${l.title}</span>
+    <div class="bg-white rounded-xl p-3 text-center shadow-sm score-card border border-gray-50" title="${l.title}">
+      <span class="text-lg">${l.icon || "📚"}</span>
+      <span class="text-[10px] text-gray-500 block truncate mt-1">${l.title}</span>
       <div class="text-lg font-bold ${l.score>0?"text-green-600":"text-gray-300"}">${l.score||0}</div>
     </div>`).join("");
 }
 
 // ══════════════════════════════════════════════════════════════
-//  СТРАНИЦА: LESSON
+//  LESSON PAGE  — full engine
 // ══════════════════════════════════════════════════════════════
 
 async function initLessonPage() {
   if (!currentUser)    { showAuthModal(); loadPage("home"); return; }
   if (!activeLessonId) { loadPage("home"); return; }
+
   document.getElementById("backToHomeBtn")?.addEventListener("click", () => loadPage("home"));
+
   try {
-    const [lesson, tasks] = await Promise.all([
+    const [lesson, tasks, theory] = await Promise.all([
       apiFetch(`/lessons/${activeLessonId}`),
       apiFetch(`/lessons/${activeLessonId}/tasks`),
+      apiFetch(`/lessons/${activeLessonId}/theory`).catch(() => []),
     ]);
+
     setElText("lessonTitle",    lesson.title);
     setElText("lessonLevel",    lesson.level);
     setElText("lessonXpReward", `+${lesson.xp_reward} XP`);
-    lessonTasks = tasks;
-    taskIndex   = 0;
-    if (!tasks.length) {
-      document.getElementById("taskCard").innerHTML = `
-        <div class="text-center py-12 text-gray-400">
-          <i class="fas fa-box-open text-5xl mb-3"></i><p>Заданий пока нет</p>
-        </div>`;
-      document.getElementById("completeBtn")?.classList.remove("hidden");
-      bindCompleteBtn(lesson.id);
-      return;
+
+    lessonTasks  = tasks;
+    taskIndex    = 0;
+    taskAnswered = false;
+
+    // Show theory panel first (if any), else go straight to tasks
+    if (theory && theory.length > 0) {
+      renderTheoryPanel(theory);
+      showBlock("theoryPanel");
+      hideBlock("progressSection");
+      hideBlock("taskCard");
+      hideBlock("navButtons");
+
+      document.getElementById("startTasksBtn")?.addEventListener("click", () => {
+        hideBlock("theoryPanel");
+        if (!lessonTasks.length) {
+          showNoTasks(lesson.id);
+          return;
+        }
+        showBlock("progressSection");
+        showBlock("taskCard");
+        showBlock("navButtons");
+        renderTask(0);
+      });
+    } else {
+      hideBlock("theoryPanel");
+      if (!lessonTasks.length) { showNoTasks(lesson.id); return; }
+      showBlock("progressSection");
+      showBlock("taskCard");
+      showBlock("navButtons");
+      renderTask(0);
     }
-    renderTask(0);
+
   } catch(err) {
-    showToast("Не удалось загрузить урок","error"); loadPage("home");
+    showToast("Сабакты жүктөө мүмкүн болгон жок","error");
+    loadPage("home");
   }
 }
 
+function renderTheoryPanel(theoryList) {
+  const container = document.getElementById("theoryContent");
+  if (!container) return;
+  container.innerHTML = theoryList.map(t => `
+    <div class="bg-white rounded-xl p-4 border border-blue-100">
+      <h4 class="font-bold text-blue-700 text-sm mb-2">${t.title}</h4>
+      <div class="theory-content text-sm">${t.content}</div>
+      ${t.examples ? `
+        <div class="mt-2 text-xs text-gray-500 italic border-t border-blue-50 pt-2">
+          ${t.examples.split("/").map(e => `<span class="block">▸ ${e.trim()}</span>`).join("")}
+        </div>` : ""}
+    </div>`).join("");
+}
+
+function showNoTasks(lessonId) {
+  hideBlock("progressSection");
+
+  const card = document.getElementById("taskCard");
+  if (card) {
+    card.classList.remove("hidden");
+    card.innerHTML = `
+      <div class="flex-1 flex flex-col items-center justify-center py-8 text-center">
+        <div class="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-4">
+          <i class="fas fa-graduation-cap text-green-400 text-3xl"></i>
+        </div>
+        <p class="font-bold text-lg text-gray-700 mb-1">Теорияны окудуңуз!</p>
+        <p class="text-gray-400 text-sm">Бул сабакта практикалык тапшырмалар жок.<br>Сабакты аяктап кийинкисине өтүңүз.</p>
+      </div>`;
+  }
+
+  const navButtons = document.getElementById("navButtons");
+  if (navButtons) navButtons.classList.remove("hidden");
+
+  const prevBtn = document.getElementById("prevTaskBtn");
+  const nextBtn = document.getElementById("nextTaskBtn");
+  if (prevBtn) prevBtn.classList.add("invisible");
+  if (nextBtn) nextBtn.classList.add("hidden");
+
+  const completeBtn = document.getElementById("completeBtn");
+  if (completeBtn) completeBtn.classList.remove("hidden");
+
+  bindCompleteBtn(lessonId);
+}
+
+// ── renderTask ────────────────────────────────────────────────
+
 function renderTask(index) {
-  const task = lessonTasks[index];
+  const task  = lessonTasks[index];
   if (!task) return;
   taskAnswered = false;
-  const total = lessonTasks.length;
-  setElText("taskProgressLabel", `${index} / ${total}`);
-  setElStyle("taskProgressBar","width", `${Math.round((index/total)*100)}%`);
 
+  const total = lessonTasks.length;
+  setElText("taskProgressLabel", `${index + 1} / ${total}`);
+  setElStyle("taskProgressBar","width", `${Math.round(((index) / total) * 100)}%`);
+
+  // Render step dots
+  const stepsEl = document.getElementById("taskSteps");
+  if (stepsEl) {
+    stepsEl.innerHTML = lessonTasks.map((_, i) =>
+      `<div class="w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+        i < index  ? "bg-green-500" :
+        i === index ? "bg-green-400 ring-2 ring-green-300 scale-125" :
+                       "bg-gray-200"
+      }"></div>`
+    ).join("");
+  }
+
+  // Nav buttons
   const prevBtn     = document.getElementById("prevTaskBtn");
   const nextBtn     = document.getElementById("nextTaskBtn");
   const completeBtn = document.getElementById("completeBtn");
@@ -534,110 +616,204 @@ function renderTask(index) {
   nextBtn?.classList.add("hidden");
   completeBtn?.classList.add("hidden");
 
-  // Сброс обработчика "Назад"
+  // Re-bind prev
   const prevClone = prevBtn?.cloneNode(true);
   prevBtn?.replaceWith(prevClone);
-  document.getElementById("prevTaskBtn")?.addEventListener("click", () => { if(taskIndex>0){ taskIndex--; renderTask(taskIndex); } });
+  document.getElementById("prevTaskBtn")?.addEventListener("click", () => {
+    if (taskIndex > 0) { taskIndex--; renderTask(taskIndex); }
+  });
 
   const card = document.getElementById("taskCard");
   if (!card) return;
+  card.classList.add("pop-in");
+  setTimeout(() => card.classList.remove("pop-in"), 400);
 
-  if (task.task_type === "translate" || task.task_type === "fill") {
-    card.innerHTML = `
-      <div>
-        <p class="text-xs text-gray-400 uppercase mb-2">${task.task_type==="translate"?"Переведите":"Заполните пропуск"}</p>
-        <p class="text-xl font-semibold mb-6">${task.prompt}</p>
-        <input type="text" id="taskAnswer" placeholder="Ваш ответ..."
-               class="w-full border-2 border-gray-200 rounded-xl p-3 text-lg focus:border-green-400 focus:outline-none transition">
-      </div>
-      <div class="flex justify-end mt-4">
-        <button id="checkAnswerBtn" class="bg-green-500 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-green-600 transition">
-          Проверить
-        </button>
-      </div>`;
-    document.getElementById("taskAnswer")?.addEventListener("keydown", e => { if(e.key==="Enter") document.getElementById("checkAnswerBtn")?.click(); });
-    document.getElementById("checkAnswerBtn")?.addEventListener("click", () => submitAnswer(task.id));
-
-  } else if (task.task_type === "choice") {
-    let options = [];
-    try { options = JSON.parse(task.prompt); } catch { options = [task.prompt]; }
-    const question = Array.isArray(options) ? options[0] : task.prompt;
-    const choices  = Array.isArray(options) && options.length > 1 ? options.slice(1) : ["A","B","C","D"];
-    card.innerHTML = `
-      <div>
-        <p class="text-xs text-gray-400 uppercase mb-2">Выберите правильный вариант</p>
-        <p class="text-xl font-semibold mb-6">${question}</p>
-        <div class="grid grid-cols-2 gap-3">
-          ${choices.map(opt => `
-            <button class="choice-btn border-2 border-gray-200 rounded-xl p-3 text-left hover:border-green-400 transition" data-value="${opt}">
-              ${opt}
-            </button>`).join("")}
-        </div>
-      </div>`;
-    card.querySelectorAll(".choice-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (taskAnswered) return;
-        card.querySelectorAll(".choice-btn").forEach(b => b.classList.remove("border-green-400","bg-green-50"));
-        btn.classList.add("border-green-400","bg-green-50");
-        submitAnswer(task.id, btn.dataset.value);
-      });
-    });
-
+  if (task.task_type === "choice") {
+    renderChoiceTask(card, task);
+  } else if (task.task_type === "fill") {
+    renderFillTask(card, task);
   } else {
-    card.innerHTML = `
-      <p class="text-xl font-semibold mb-6">${task.prompt}</p>
-      <input type="text" id="taskAnswer" placeholder="Ваш ответ..." class="w-full border-2 border-gray-200 rounded-xl p-3">
-      <button id="checkAnswerBtn" class="mt-4 bg-green-500 text-white px-6 py-2.5 rounded-xl">Проверить</button>`;
-    document.getElementById("checkAnswerBtn")?.addEventListener("click", () => submitAnswer(task.id));
+    renderTranslateTask(card, task);
   }
 }
 
-async function submitAnswer(taskId, forcedAnswer) {
+// ── Choice task ───────────────────────────────────────────────
+
+function renderChoiceTask(card, task) {
+  const options = task.options || [];
+  card.innerHTML = `
+    <div class="flex items-center gap-2 mb-1">
+      <span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold">Тандоо</span>
+      <span class="text-xs text-gray-400">+${task.xp_reward} XP</span>
+    </div>
+    <p class="text-lg font-semibold mb-5 leading-snug">${task.prompt}</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="choiceGrid">
+      ${options.map((opt, i) => `
+        <button class="choice-btn" data-value="${opt}" data-idx="${i}">
+          <span class="inline-block w-6 h-6 rounded-full bg-gray-100 text-xs font-bold mr-2 text-center leading-6">${"ABCD"[i]}</span>${opt}
+        </button>`).join("")}
+    </div>
+    <div id="taskFeedback" class="hidden mt-4"></div>`;
+
+  card.querySelectorAll(".choice-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (taskAnswered) return;
+      await submitTaskAnswer(task, btn.dataset.value, "choice", btn);
+    });
+  });
+}
+
+// ── Fill-in-blank task ────────────────────────────────────────
+
+function renderFillTask(card, task) {
+  // Replace ___ with an input
+  const promptHtml = task.prompt.replace(/___+/g,
+    `<input type="text" id="fillAnswer" class="fill-input inline-block w-40 mx-1 text-center"
+            placeholder="..." autocomplete="off" autocorrect="off" autocapitalize="off">`);
+
+  card.innerHTML = `
+    <div class="flex items-center gap-2 mb-1">
+      <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">Толтуруу</span>
+      <span class="text-xs text-gray-400">+${task.xp_reward} XP</span>
+    </div>
+    <p class="text-lg font-semibold mb-5 leading-snug">${promptHtml}</p>
+    <button id="checkAnswerBtn"
+            class="bg-green-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-green-600 transition">
+      Текшерүү ✓
+    </button>
+    <div id="taskFeedback" class="hidden mt-4"></div>`;
+
+  const inp = document.getElementById("fillAnswer");
+  inp?.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("checkAnswerBtn")?.click(); });
+  document.getElementById("checkAnswerBtn")?.addEventListener("click", async () => {
+    const val = inp?.value.trim();
+    if (!val) return showToast("Жооп жазыңыз","warn");
+    await submitTaskAnswer(task, val, "fill", null);
+  });
+  inp?.focus();
+}
+
+// ── Translate task ────────────────────────────────────────────
+
+function renderTranslateTask(card, task) {
+  card.innerHTML = `
+    <div class="flex items-center gap-2 mb-1">
+      <span class="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">Котормо</span>
+      <span class="text-xs text-gray-400">+${task.xp_reward} XP</span>
+    </div>
+    <p class="text-lg font-semibold mb-5 leading-snug">${task.prompt}</p>
+    <input type="text" id="taskAnswer" placeholder="Котормону жазыңыз..."
+           class="fill-input text-base"
+           autocomplete="off" autocorrect="off" autocapitalize="off">
+    <button id="checkAnswerBtn"
+            class="mt-3 bg-green-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-green-600 transition">
+      Текшерүү ✓
+    </button>
+    <div id="taskFeedback" class="hidden mt-4"></div>`;
+
+  const inp = document.getElementById("taskAnswer");
+  inp?.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("checkAnswerBtn")?.click(); });
+  document.getElementById("checkAnswerBtn")?.addEventListener("click", async () => {
+    const val = inp?.value.trim();
+    if (!val) return showToast("Жооп жазыңыз","warn");
+    await submitTaskAnswer(task, val, "translate", null);
+  });
+  inp?.focus();
+}
+
+// ── Core submit ───────────────────────────────────────────────
+
+async function submitTaskAnswer(task, answer, type, choiceBtn) {
   if (taskAnswered) return;
   taskAnswered = true;
-  const answer = forcedAnswer || document.getElementById("taskAnswer")?.value.trim();
-  if (!answer) { taskAnswered = false; return showToast("Введите ответ","error"); }
+
+  // Disable inputs immediately
+  document.getElementById("checkAnswerBtn")     && (document.getElementById("checkAnswerBtn").disabled = true);
+  document.getElementById("taskAnswer")         && (document.getElementById("taskAnswer").disabled = true);
+  document.getElementById("fillAnswer")         && (document.getElementById("fillAnswer").disabled = true);
+  document.querySelectorAll(".choice-btn").forEach(b => b.disabled = true);
+
   try {
-    const result = await apiFetch(`/lessons/tasks/${taskId}/submit`,{ method:"POST", json:{ answer } });
-    showAnswerFeedback(result);
-    if (result.earned_xp && currentUser) {
-      currentUser.xp    = (currentUser.xp||0) + result.earned_xp;
-      currentUser.level = Math.floor(currentUser.xp/100)+1;
+    const result = await apiFetch(`/lessons/tasks/${task.id}/submit`, {
+      method: "POST",
+      json:   { answer },
+    });
+
+    // Visual feedback
+    if (type === "choice" && choiceBtn) {
+      if (result.correct) {
+        choiceBtn.classList.add("correct");
+      } else {
+        choiceBtn.classList.add("wrong");
+        // Highlight correct answer
+        document.querySelectorAll(".choice-btn").forEach(b => {
+          if (b.dataset.value.toLowerCase().trim() === result.expected.toLowerCase().trim()) {
+            b.classList.add("reveal");
+          }
+        });
+      }
+    }
+
+    if (type === "fill") {
+      const inp = document.getElementById("fillAnswer");
+      inp?.classList.add(result.correct ? "correct" : "wrong");
+    }
+
+    if (type === "translate") {
+      const inp = document.getElementById("taskAnswer");
+      inp?.classList.add(result.correct ? "correct" : "wrong");
+    }
+
+    // Feedback banner
+    const fb = document.getElementById("taskFeedback");
+    if (fb) {
+      fb.className = result.correct ? "feedback-correct mt-4" : "feedback-wrong mt-4";
+      const hint = result.explanation || task.hint;
+      fb.innerHTML = result.correct
+        ? `✅ Туура! ${result.earned_xp > 0 ? `<span class="font-black">+${result.earned_xp} XP</span>` : ""}`
+        : `❌ Туура эмес. Туура жооп: <b>${result.expected}</b>${hint ? `<br><span class="text-xs opacity-80 mt-1 block">💡 ${hint}</span>` : ""}`;
+      fb.classList.remove("hidden");
+    }
+
+    // Update XP
+    if (result.earned_xp > 0 && currentUser) {
+      currentUser.xp    = (currentUser.xp || 0) + result.earned_xp;
+      currentUser.level = Math.floor(currentUser.xp / 100) + 1;
       localStorage.setItem("tilzone_user", JSON.stringify(currentUser));
       updateUIForAuth();
-      if (result.earned_xp > 0) showToast(`+${result.earned_xp} XP!`);
+      showToast(`+${result.earned_xp} XP!`);
     }
+
+    // After short delay, show nav
     setTimeout(() => {
       const isLast = taskIndex >= lessonTasks.length - 1;
       if (isLast) {
-        document.getElementById("completeBtn")?.classList.remove("hidden");
+        // Update progress bar to 100%
+        setElStyle("taskProgressBar","width","100%");
+        setElText("taskProgressLabel", `${lessonTasks.length} / ${lessonTasks.length}`);
+        showBlock("completeBtn");
         bindCompleteBtn(activeLessonId);
       } else {
         const nextBtn = document.getElementById("nextTaskBtn");
         nextBtn?.classList.remove("hidden");
-        const nextClone = nextBtn?.cloneNode(true);
-        nextBtn?.replaceWith(nextClone);
-        document.getElementById("nextTaskBtn")?.addEventListener("click", () => { taskIndex++; renderTask(taskIndex); });
+        const clone = nextBtn?.cloneNode(true);
+        nextBtn?.replaceWith(clone);
+        document.getElementById("nextTaskBtn")?.addEventListener("click", () => {
+          taskIndex++;
+          renderTask(taskIndex);
+        });
       }
-    }, 800);
-  } catch(err) {
-    taskAnswered = false; showToast(err.message||"Ошибка проверки","error");
-  }
-}
+    }, result.correct ? 600 : 1200);
 
-function showAnswerFeedback(result) {
-  const card = document.getElementById("taskCard");
-  if (!card) return;
-  const fb = document.createElement("div");
-  fb.className = `mt-4 p-4 rounded-xl text-sm font-medium ${result.correct
-    ? "bg-green-50 text-green-700 border border-green-200"
-    : "bg-red-50 text-red-700 border border-red-200"}`;
-  fb.innerHTML = result.correct
-    ? `✅ Правильно!${result.earned_xp>0?" +"+result.earned_xp+" XP":""}`
-    : `❌ Неверно. Правильный ответ: <span class="font-bold">${result.expected}</span>`;
-  card.appendChild(fb);
-  const inp = card.querySelector("input"); if (inp) inp.disabled = true;
-  const checkBtn = document.getElementById("checkAnswerBtn"); if (checkBtn) checkBtn.disabled = true;
+  } catch(err) {
+    taskAnswered = false;
+    // Re-enable inputs on error
+    document.getElementById("checkAnswerBtn")   && (document.getElementById("checkAnswerBtn").disabled = false);
+    document.getElementById("taskAnswer")       && (document.getElementById("taskAnswer").disabled = false);
+    document.getElementById("fillAnswer")       && (document.getElementById("fillAnswer").disabled = false);
+    document.querySelectorAll(".choice-btn").forEach(b => b.disabled = false);
+    showToast(err.message || "Жооп текшерилбеди","error");
+  }
 }
 
 function bindCompleteBtn(lessonId) {
@@ -646,20 +822,508 @@ function bindCompleteBtn(lessonId) {
   const clone = btn.cloneNode(true);
   btn.replaceWith(clone);
   document.getElementById("completeBtn")?.addEventListener("click", async () => {
+    if (!currentUser) { showAuthModal(); return; }
     try {
       const result = await apiFetch(`/lessons/${lessonId}/complete`,{ method:"POST" });
-      if (result.earned_xp > 0) showToast(`🏁 Урок завершён! +${result.earned_xp} XP`);
+      showToast(result.earned_xp > 0
+        ? `🏁 Сабак бүттү! +${result.earned_xp} XP 🎉`
+        : "✅ Сабак мурунтан эле бүтүрүлгөн");
       if (currentUser) {
-        currentUser.xp = result.total_xp; currentUser.level = result.level; currentUser.streak = result.streak;
+        currentUser.xp     = result.total_xp;
+        currentUser.level  = result.level;
+        currentUser.streak = result.streak;
         localStorage.setItem("tilzone_user", JSON.stringify(currentUser));
       }
-      updateUIForAuth(); loadPage("home");
+      updateUIForAuth();
+      loadPage("home");
     } catch(err) { showToast(err.message,"error"); }
   });
 }
 
 // ══════════════════════════════════════════════════════════════
-//  СТРАНИЦА: PROFILE
+//  THEORY PAGE — loads from API
+// ══════════════════════════════════════════════════════════════
+
+async function initTheoryPage() {
+  showBlock("theoryLoading");
+  hideBlock("theoryGrid");
+  hideBlock("theoryEmpty");
+
+  try {
+    allTheoryCards = await apiFetch("/theory");
+    renderTheoryFilters();
+    renderTheoryGrid(allTheoryCards);
+  } catch {
+    document.getElementById("theoryLoading").innerHTML = `
+      <p class="text-red-400">Теорияны жүктөө мүмкүн болгон жок</p>`;
+  }
+
+  // Modal close (two buttons + backdrop)
+  ["closeTheoryModal", "closeTheoryModal2"].forEach(id => {
+    document.getElementById(id)?.addEventListener("click", () => hideEl("theoryModal"));
+  });
+  document.getElementById("theoryModal")?.addEventListener("click", e => {
+    if (e.target === document.getElementById("theoryModal")) hideEl("theoryModal");
+  });
+
+  // Live search
+  document.getElementById("theorySearch")?.addEventListener("input", e => {
+    const q = e.target.value.trim().toLowerCase();
+    const filtered = allTheoryCards.filter(c =>
+      c.title.toLowerCase().includes(q) ||
+      c.content.toLowerCase().includes(q) ||
+      c.category.toLowerCase().includes(q)
+    );
+    renderTheoryGrid(filtered);
+  });
+}
+
+const CATEGORY_META = {
+  tenses:        { label: "Чактар",       icon: "⏰" },
+  articles:      { label: "Артикль",       icon: "🅰️" },
+  verbs:         { label: "Этиштер",       icon: "⚡" },
+  pronouns:      { label: "Алмаш.",        icon: "👤" },
+  phrases:       { label: "Сүйлөмдөр",    icon: "💬" },
+  pronunciation: { label: "Айтылыш",       icon: "🔊" },
+};
+
+function renderTheoryFilters() {
+  const container = document.getElementById("categoryFilters");
+  if (!container) return;
+
+  const cats = [...new Set(allTheoryCards.map(c => c.category))];
+  const extra = cats.map(cat => {
+    const meta = CATEGORY_META[cat] || { label: cat, icon: "📖" };
+    return `<button data-cat="${cat}"
+              class="cat-filter px-4 py-1.5 rounded-full text-sm font-medium border transition">
+              ${meta.icon} ${meta.label}
+            </button>`;
+  }).join("");
+  container.innerHTML = `
+    <button data-cat="" class="cat-filter active px-4 py-1.5 rounded-full text-sm font-medium border border-green-500 bg-green-500 text-white transition">
+      Баары
+    </button>` + extra;
+
+  container.querySelectorAll(".cat-filter").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeTheoryCat = btn.dataset.cat;
+      container.querySelectorAll(".cat-filter").forEach(b => b.classList.remove("active","bg-green-500","text-white","border-green-500"));
+      btn.classList.add("active","bg-green-500","text-white","border-green-500");
+      const filtered = activeTheoryCat
+        ? allTheoryCards.filter(c => c.category === activeTheoryCat)
+        : allTheoryCards;
+      renderTheoryGrid(filtered);
+    });
+  });
+}
+
+function renderTheoryGrid(cards) {
+  hideBlock("theoryLoading");
+  const grid  = document.getElementById("theoryGrid");
+  const empty = document.getElementById("theoryEmpty");
+  if (!grid) return;
+
+  if (!cards.length) {
+    hideBlock("theoryGrid");
+    showBlock("theoryEmpty");
+    return;
+  }
+
+  showBlock("theoryGrid");
+  hideBlock("theoryEmpty");
+
+  const CAT_COLORS = {
+    tenses:        "bg-blue-50   border-blue-100   text-blue-800",
+    articles:      "bg-amber-50  border-amber-100  text-amber-800",
+    verbs:         "bg-purple-50 border-purple-100 text-purple-800",
+    pronouns:      "bg-pink-50   border-pink-100   text-pink-800",
+    phrases:       "bg-green-50  border-green-100  text-green-800",
+    pronunciation: "bg-teal-50   border-teal-100   text-teal-800",
+  };
+
+  grid.innerHTML = cards.map(card => {
+    const meta  = CATEGORY_META[card.category] || { label: card.category, icon: "📖" };
+    const color = CAT_COLORS[card.category]    || "bg-gray-50 border-gray-100 text-gray-800";
+    const preview = card.content.replace(/<[^>]+>/g, "").substring(0, 90) + "…";
+    return `
+      <div class="theory-card bg-white rounded-2xl p-5 shadow-sm cursor-pointer border"
+           data-id="${card.id}">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-2xl">${meta.icon}</span>
+          <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${color}">${meta.label}</span>
+        </div>
+        <h3 class="font-bold text-base mb-1 leading-tight">${card.title}</h3>
+        <p class="text-xs text-gray-400 leading-relaxed">${preview}</p>
+      </div>`;
+  }).join("");
+
+  grid.querySelectorAll(".theory-card").forEach(el => {
+    el.addEventListener("click", () => {
+      const card = cards.find(c => c.id === parseInt(el.dataset.id));
+      if (card) openTheoryModal(card);
+    });
+  });
+}
+
+function openTheoryModal(card) {
+  const meta = CATEGORY_META[card.category] || { icon: "📖", label: card.category };
+  document.getElementById("theoryModalTitle").innerHTML = `${meta.icon} ${card.title}`;
+  document.getElementById("theoryModalBody").innerHTML  = card.content;
+
+  const exBox  = document.getElementById("theoryModalExamples");
+  const exText = document.getElementById("theoryModalExamplesText");
+  if (card.examples && card.examples.trim()) {
+    exText.innerHTML = card.examples.split("/").map(e => `<p>▸ ${e.trim()}</p>`).join("");
+    showBlock("theoryModalExamples");
+  } else {
+    hideBlock("theoryModalExamples");
+  }
+
+  showEl("theoryModal");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MVP PAGE
+// ══════════════════════════════════════════════════════════════
+
+function initPvPPage() {
+  const div = document.getElementById("pvpCard");
+  if (!div) return;
+
+  let ws = null;
+  let roomId = null;
+  let answered = false;
+  let startTime = null;
+  let timerInterval = null;
+  const myUserId = currentUser?.id;
+
+  renderLobby();
+
+  function renderLobby() {
+    div.innerHTML = `
+      <div class="text-center py-4">
+        <div class="text-6xl mb-4">⚔️</div>
+        <h2 class="text-2xl font-bold mb-2">PvP Режим</h2>
+        <p class="text-gray-500 mb-6">Сразись с другим игроком — кто быстрее переведёт слово</p>
+        <button id="findBtn" class="bg-green-500 text-white px-10 py-3 rounded-full text-lg font-semibold hover:bg-green-600 transition">
+          🔍 Найти соперника
+        </button>
+      </div>`;
+
+    div.querySelector("#findBtn").addEventListener("click", () => {
+      if (!currentUser) { showAuthModal(); return; }
+      connectWS();
+    });
+  }
+
+  function connectWS() {
+    div.innerHTML = `
+      <div class="text-center py-8">
+        <i class="fas fa-spinner fa-spin text-4xl text-green-500 mb-4"></i>
+        <p class="text-lg animate-pulse">🔍 Ищем соперника...</p>
+        <button id="cancelBtn" class="mt-6 text-gray-400 text-sm underline">Отмена</button>
+      </div>`;
+
+    div.querySelector("#cancelBtn").addEventListener("click", () => {
+      ws?.close();
+      renderLobby();
+    });
+
+    const token = localStorage.getItem("tilzone_access_token");
+    console.log("token:", token); // посмотрим что там
+    if (!token) {
+      showError("Необходимо войти в аккаунт");
+    return;
+}
+    const wsUrl = `ws://localhost:8000/pvp/ws?token=${token}`;
+
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (e) {
+      showError("Не удалось подключиться к серверу");
+      return;
+    }
+
+    ws.onopen = () => console.log("WS connected");
+
+    ws.onmessage = ({ data }) => {
+      let msg;
+      try { msg = JSON.parse(data); } catch { return; }
+
+      if (msg.type === "waiting") {
+        // уже показан спиннер, ничего не делаем
+      }
+      if (msg.type === "match_found") {
+        roomId = msg.room_id;
+        answered = false;
+        startTime = Date.now();
+        ws.send(JSON.stringify({ type: "join_room", room_id: roomId }));
+        renderQuestion(msg.question, msg.options);
+      }
+      if (msg.type === "answer_result") {
+        markAnswered(msg.correct);
+        clearInterval(timerInterval);
+      }
+      if (msg.type === "round_end") {
+        renderResult(msg);
+      }
+    };
+
+    ws.onerror = () => showError("Ошибка соединения. Проверь что сервер запущен.");
+    ws.onclose = () => {
+      clearInterval(timerInterval);
+    };
+  }
+
+  function renderQuestion(word, options) {
+    div.innerHTML = `
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold">⚔️ Переведи слово</h2>
+        <span id="timer" class="text-2xl font-mono font-bold text-red-500">10</span>
+      </div>
+      <p class="text-center text-3xl font-bold mb-6">${word}</p>
+      <div class="flex gap-3 justify-center flex-wrap" id="options"></div>
+      <p id="status" class="mt-4 text-center text-sm text-gray-400">Соперник думает...</p>`;
+
+    options.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.className = "pvp-btn bg-gray-50 px-6 py-3 rounded-xl border-2 border-transparent hover:bg-gray-100 transition text-lg";
+      btn.textContent = opt;
+      btn.addEventListener("click", () => sendAnswer(opt));
+      div.querySelector("#options").appendChild(btn);
+    });
+
+    let t = 10;
+    const timerEl = div.querySelector("#timer");
+    timerInterval = setInterval(() => {
+      t--;
+      if (timerEl) timerEl.textContent = t;
+      if (t <= 0) {
+        clearInterval(timerInterval);
+        if (!answered) sendAnswer("__timeout__");
+      }
+    }, 1000);
+  }
+
+  function sendAnswer(answer) {
+    if (answered) return;
+    answered = true;
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    ws.send(JSON.stringify({ type: "answer", answer, elapsed }));
+    div.querySelectorAll(".pvp-btn").forEach(b => b.disabled = true);
+    const status = div.querySelector("#status");
+    if (status) status.textContent = `⏱ Ты ответил за ${elapsed}с. Ждём соперника...`;
+  }
+
+  function markAnswered(correct) {
+    if (typeof showToast === "function") {
+      showToast(correct ? "✅ Верно! +40 XP" : "❌ Неверно", correct ? "success" : "error");
+    }
+  }
+
+  function renderResult(msg) {
+    const iWon = msg.winner_id === myUserId;
+    const me    = msg.p1.user_id === myUserId ? msg.p1 : msg.p2;
+    const enemy = msg.p1.user_id === myUserId ? msg.p2 : msg.p1;
+
+    div.innerHTML = `
+      <div class="text-center">
+        <div class="text-6xl mb-3">${iWon ? "🏆" : "😔"}</div>
+        <h2 class="text-2xl font-bold mb-4">${iWon ? "Победа! +40 XP" : "Поражение"}</h2>
+        <div class="grid grid-cols-2 gap-4 my-4 text-sm">
+          <div class="bg-green-50 rounded-xl p-4">
+            <p class="font-bold mb-1">Ты</p>
+            <p class="text-lg">${me.correct ? "✅" : "❌"} ${me.time.toFixed(2)}с</p>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-4">
+            <p class="font-bold mb-1">Соперник</p>
+            <p class="text-lg">${enemy.correct ? "✅" : "❌"} ${enemy.time.toFixed(2)}с</p>
+          </div>
+        </div>
+        <button id="playAgainBtn" class="mt-2 bg-purple-500 text-white px-8 py-3 rounded-full hover:bg-purple-600 transition">
+          Сыграть ещё ➜
+        </button>
+      </div>`;
+
+    div.querySelector("#playAgainBtn").addEventListener("click", () => {
+      ws?.close();
+      renderLobby();
+    });
+  }
+
+  function showError(msg) {
+    div.innerHTML = `
+      <div class="text-center py-8">
+        <div class="text-5xl mb-4">⚠️</div>
+        <p class="text-red-500 mb-4">${msg}</p>
+        <button id="retryBtn" class="bg-green-500 text-white px-8 py-3 rounded-full hover:bg-green-600 transition">
+          Попробовать снова
+        </button>
+      </div>`;
+    div.querySelector("#retryBtn").addEventListener("click", renderLobby);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AI PAGE
+// ══════════════════════════════════════════════════════════════
+
+function initAIPage() {
+  sessionErrors = [];
+  renderAIScenarios();
+  renderHistoryPanel();
+  setElText("chatScenarioTitle", currentScenario.name);
+  document.getElementById("sendChatBtn")?.addEventListener("click", sendAIMessage);
+  document.getElementById("chatInput")?.addEventListener("keydown", e => { if (e.key === "Enter") sendAIMessage(); });
+  document.getElementById("voiceBtn")?.addEventListener("click", () => showToast("🎤 Үн киргизүү жакында болот", "info"));
+  document.getElementById("clearChatBtn")?.addEventListener("click", () => {
+    chatHistory = [...currentScenario.dialog];
+    sessionErrors = [];
+    hideBlock("errorAnalysisBar");
+    renderChat();
+    renderHistoryPanel();
+  });
+  document.getElementById("loadHistoryBtn")?.addEventListener("click", loadAIHistory);
+  renderLevelHints();
+}
+
+async function sendAIMessage() {
+  if (!currentUser) { showAuthModal(); return; }
+  const inp  = document.getElementById("chatInput");
+  const text = inp?.value.trim();
+  if (!text) return;
+  chatHistory.push({ role: "user", text });
+  inp.value = "";
+  chatHistory.push({ role: "assistant", text: "...", typing: true });
+  renderChat();
+
+  const historyForApi = chatHistory
+    .filter(m => !m.typing && !m.correction && (m.role === "user" || m.role === "assistant"))
+    .slice(-20).slice(0, -1)
+    .map(m => ({ role: m.role, content: m.text }));
+
+  try {
+    const data = await apiFetch("/ai/chat", {
+      method: "POST",
+      json: { message: text, scenario: currentScenario.name, history: historyForApi },
+    });
+    chatHistory = chatHistory.filter(m => !m.typing);
+    chatHistory.push({ role: "assistant", text: data.response });
+    if (data.correction) {
+      chatHistory.push({ role: "assistant", text: `✏️ ${data.correction}`, correction: true });
+      sessionErrors.push({ original: text, corrected: data.correction });
+      const bar = document.getElementById("errorAnalysisBar");
+      const txt = document.getElementById("errorAnalysisText");
+      if (bar && txt) { txt.innerText = data.correction; bar.classList.remove("hidden"); }
+    }
+    if (data.level_hint) {
+      const badge = document.getElementById("aiLevelBadge");
+      if (badge) { badge.innerText = data.level_hint; badge.classList.remove("hidden"); }
+    }
+    if (data.earned_xp > 0 && currentUser) {
+      currentUser.xp    = (currentUser.xp || 0) + data.earned_xp;
+      currentUser.level = Math.floor(currentUser.xp / 100) + 1;
+      localStorage.setItem("tilzone_user", JSON.stringify(currentUser));
+      updateUIForAuth();
+      showToast(`+${data.earned_xp} XP!`);
+    }
+    renderHistoryPanel();
+  } catch(err) {
+    chatHistory = chatHistory.filter(m => !m.typing);
+    const msg = err.status === 503
+  ? "⚠️ AI убактылуу жеткиликсиз. Кийинчерээк аракет кылыңыз."
+  : "⚠️ Сервер менен байланыш катасы.";
+    chatHistory.push({ role: "assistant", text: msg, error: true });
+  }
+  renderChat();
+}
+
+function renderAIScenarios() {
+  const div = document.getElementById("scenarioList");
+  if (!div) return;
+  div.innerHTML = aiScenarios.map(s => `
+    <div class="p-2 rounded-xl hover:bg-green-50 cursor-pointer scenario-item text-sm
+                ${s.id === currentScenario.id ? "bg-green-50 text-green-700 font-medium" : ""}"
+         data-id="${s.id}">${s.name}</div>`).join("");
+  div.querySelectorAll(".scenario-item").forEach(el => {
+    el.addEventListener("click", () => {
+      currentScenario = aiScenarios.find(s => s.id === parseInt(el.dataset.id));
+      chatHistory     = [...currentScenario.dialog];
+      sessionErrors   = [];
+      setElText("chatScenarioTitle", currentScenario.name);
+      renderAIScenarios(); renderChat(); renderHistoryPanel();
+    });
+  });
+  renderChat();
+}
+
+function renderChat() {
+  const chatDiv = document.getElementById("chatMessages");
+  if (!chatDiv) return;
+  chatDiv.innerHTML = chatHistory.map(msg => {
+    const isUser = msg.role === "user";
+    const cls = msg.typing     ? "bg-gray-100 italic text-gray-400 animate-pulse"
+              : msg.error      ? "bg-red-50 text-red-600 border border-red-200"
+              : isUser         ? "bg-green-500 text-white"
+              : msg.correction ? "bg-amber-50 border border-amber-200 text-amber-800 text-xs"
+              : "bg-gray-100 text-gray-800";
+    return `<div class="flex ${isUser ? "justify-end" : "justify-start"}">
+      <div class="max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed ${cls}">${msg.text}</div>
+    </div>`;
+  }).join("");
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+function renderHistoryPanel() {
+  const el = document.getElementById("historyList");
+  if (!el) return;
+  const msgs = chatHistory.filter(m => m.role === "user" && !m.typing).slice(-6);
+  if (!msgs.length) { el.innerHTML = `<p class="text-gray-400 text-xs italic">Азырынча бош</p>`; return; }
+  el.innerHTML = msgs.map(m => `<div class="truncate text-xs text-gray-500 py-0.5">— ${m.text}</div>`).join("");
+}
+
+async function loadAIHistory() {
+  const el = document.getElementById("historyList");
+  if (!el) return;
+  if (!currentUser) { el.innerHTML = `<p class="text-xs text-gray-400 italic">Кирүү керек</p>`; return; }
+  el.innerHTML = `<i class="fas fa-spinner fa-spin text-green-400"></i>`;
+  try {
+    const items = await apiFetch("/ai/history?limit=10");
+    if (!items?.length) { el.innerHTML = `<p class="text-xs text-gray-400 italic">Тарых бош</p>`; return; }
+    el.innerHTML = items.map(item => `
+      <div class="text-xs border rounded-xl p-2 hover:bg-gray-50 cursor-pointer history-item"
+           data-response="${encodeURIComponent(item.response)}">
+        <p class="font-medium text-gray-600 truncate">${item.scenario}</p>
+        <p class="text-gray-400 truncate mt-0.5">— ${item.message}</p>
+      </div>`).join("");
+    el.querySelectorAll(".history-item").forEach(item => {
+      item.addEventListener("click", () => {
+        chatHistory.push({ role: "assistant", text: `📖 ${decodeURIComponent(item.dataset.response)}` });
+        renderChat();
+      });
+    });
+  } catch { el.innerHTML = `<p class="text-xs text-red-400">Тарыхты жүктөө катасы</p>`; }
+}
+
+function renderLevelHints() {
+  const el = document.getElementById("levelHints");
+  if (!el) return;
+  const xp    = currentUser?.xp || 0;
+  const level = xp < 100 ? "A1" : xp < 300 ? "A2" : xp < 700 ? "B1" : xp < 1500 ? "B2" : "C1";
+  const hints = {
+    A1: ["Баштаңыз: Hello! / Good morning!", "Суроо: What is your name?", "Жооп: My name is ..."],
+    A2: ["Колдонуңуз: Can I have...?", "Суроо: How much does it cost?", "Айтыңыз: I would like to..."],
+    B1: ["Өзүңүз жөнүндө кеңири айтыңыз", "Өткөн чакты колдонуңуз", "Суроо: What do you think?"],
+    B2: ["Идиомаларды колдонуңуз", "Пикириңизди далилдеңиз", "Кеңейтилген сүйлөмдөр айтыңыз"],
+    C1: ["Абстрактуу темаларды талкуулаңыз", "Шарттуу ырайым колдонуңуз", "Татаал сүйлөмдөр куруңуз"],
+  };
+  el.innerHTML = `
+    <p class="text-xs font-semibold text-green-600 mb-2">Деңгээл: ${level}</p>
+    ${(hints[level]||hints.A1).map(h => `<p class="text-xs text-gray-500">• ${h}</p>`).join("")}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PROFILE PAGE
 // ══════════════════════════════════════════════════════════════
 
 function initProfilePage() {
@@ -670,7 +1334,9 @@ function initProfilePage() {
   document.querySelectorAll(".profile-tab").forEach(btn => {
     btn.addEventListener("click", () => showProfileTab(btn.dataset.tab));
   });
-  document.getElementById("logoutBtn")?.addEventListener("click", () => { logout(); updateUIForAuth(); loadPage("home"); });
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
+    logout(); updateUIForAuth(); loadPage("home");
+  });
   document.getElementById("avatarInput")?.addEventListener("change", uploadAvatar);
 }
 
@@ -694,8 +1360,8 @@ async function uploadAvatar(e) {
     currentUser = data;
     localStorage.setItem("tilzone_user", JSON.stringify(currentUser));
     renderAvatar(); updateUIForAuth();
-    showToast("Аватар обновлён!");
-  } catch(err) { showToast(err.message||"Ошибка загрузки","error"); }
+    showToast("Аватар жаңыланды!");
+  } catch(err) { showToast(err.message||"Жүктөө катасы","error"); }
   finally      { loader?.classList.add("hidden"); }
 }
 
@@ -709,70 +1375,66 @@ function showProfileTab(tab) {
     content.innerHTML = `
       <h3 class="text-xl font-bold mb-4">📊 Статистика</h3>
       <div class="grid grid-cols-2 gap-4">
-        <div class="bg-green-50  p-4 rounded-xl"><p class="text-xs text-gray-500">Всего XP</p>   <p class="text-2xl font-black text-green-700">${currentUser?.xp||0}</p></div>
-        <div class="bg-orange-50 p-4 rounded-xl"><p class="text-xs text-gray-500">Стрик</p>     <p class="text-2xl font-black text-orange-600">${currentUser?.streak||0} дн.</p></div>
-        <div class="bg-blue-50   p-4 rounded-xl"><p class="text-xs text-gray-500">PvP побед</p> <p class="text-2xl font-black text-blue-600">${currentUser?.pvp_wins||0}</p></div>
+        <div class="bg-green-50  p-4 rounded-xl"><p class="text-xs text-gray-500">Жалпы XP</p>  <p class="text-2xl font-black text-green-700">${currentUser?.xp||0}</p></div>
+        <div class="bg-orange-50 p-4 rounded-xl"><p class="text-xs text-gray-500">Стрик</p>     <p class="text-2xl font-black text-orange-600">${currentUser?.streak||0} күн</p></div>
+        <div class="bg-blue-50   p-4 rounded-xl"><p class="text-xs text-gray-500">PvP жеңиш</p><p class="text-2xl font-black text-blue-600">${currentUser?.pvp_wins||0}</p></div>
         <div class="bg-purple-50 p-4 rounded-xl"><p class="text-xs text-gray-500">ELO</p>       <p class="text-2xl font-black text-purple-600">${currentUser?.elo||1000}</p></div>
-        <div class="bg-amber-50  p-4 rounded-xl"><p class="text-xs text-gray-500">Уровень</p>   <p class="text-2xl font-black text-amber-600">${currentUser?.level||1}</p></div>
-        <div class="bg-gray-50   p-4 rounded-xl"><p class="text-xs text-gray-500">Лига</p>      <p class="text-2xl font-black">${currentUser?.league||"Bronze"}</p></div>
+        <div class="bg-amber-50  p-4 rounded-xl"><p class="text-xs text-gray-500">Деңгээл</p>  <p class="text-2xl font-black text-amber-600">${currentUser?.level||1}</p></div>
+        <div class="bg-gray-50   p-4 rounded-xl"><p class="text-xs text-gray-500">Лига</p>     <p class="text-2xl font-black">${currentUser?.league||"Bronze"}</p></div>
       </div>`;
-
   } else if (tab === "edit") {
     content.innerHTML = `
-      <h3 class="text-xl font-bold mb-4">✏️ Редактировать профиль</h3>
+      <h3 class="text-xl font-bold mb-4">✏️ Профилди өзгөртүү</h3>
       <div class="space-y-4 max-w-sm">
-        <div><label class="text-sm font-medium text-gray-700 block mb-1">Имя</label>
-          <input type="text" id="editName" value="${currentUser?.name||""}"
-                 class="w-full border rounded-xl p-3 focus:border-green-400 focus:outline-none"></div>
+        <div><label class="text-sm font-medium text-gray-700 block mb-1">Ат</label>
+          <input type="text" id="editName" value="${currentUser?.name||""}" class="w-full border rounded-xl p-3 focus:border-green-400 focus:outline-none"></div>
         <div><label class="text-sm font-medium text-gray-700 block mb-1">Username</label>
-          <input type="text" id="editUsername" value="${currentUser?.username||""}"
-                 class="w-full border rounded-xl p-3 focus:border-green-400 focus:outline-none"></div>
-        <div><label class="text-sm font-medium text-gray-700 block mb-1">Родной язык</label>
+          <input type="text" id="editUsername" value="${currentUser?.username||""}" class="w-full border rounded-xl p-3 focus:border-green-400 focus:outline-none"></div>
+        <div><label class="text-sm font-medium text-gray-700 block mb-1">Эне тили</label>
           <select id="editNativeLang" class="w-full border rounded-xl p-3 focus:border-green-400 focus:outline-none">
             <option value="ky" ${currentUser?.native_language==="ky"?"selected":""}>🇰🇬 Кыргызча</option>
-            <option value="ru" ${currentUser?.native_language==="ru"?"selected":""}>🇷🇺 Русский</option>
+            <option value="ru" ${currentUser?.native_language==="ru"?"selected":""}>🇷🇺 Орусча</option>
             <option value="en" ${currentUser?.native_language==="en"?"selected":""}>🇬🇧 English</option>
           </select></div>
-        <div><label class="text-sm font-medium text-gray-700 block mb-1">Изучаемый язык</label>
+        <div><label class="text-sm font-medium text-gray-700 block mb-1">Үйрөнүүчү тил</label>
           <select id="editStudyLang" class="w-full border rounded-xl p-3 focus:border-green-400 focus:outline-none">
             <option value="ky" ${currentUser?.study_language==="ky"?"selected":""}>🇰🇬 Кыргызча</option>
-            <option value="ru" ${currentUser?.study_language==="ru"?"selected":""}>🇷🇺 Русский</option>
+            <option value="ru" ${currentUser?.study_language==="ru"?"selected":""}>🇷🇺 Орусча</option>
             <option value="en" ${currentUser?.study_language==="en"?"selected":""}>🇬🇧 English</option>
           </select></div>
         <button id="saveProfileBtn" class="w-full bg-green-500 text-white py-3 rounded-xl font-bold hover:bg-green-600 transition">
-          Сохранить изменения
+          Өзгөртүүлөрдү сактоо
         </button>
       </div>`;
     document.getElementById("saveProfileBtn")?.addEventListener("click", saveProfile);
-
   } else if (tab === "achievements") {
     const achv = [
-      ["fas fa-medal text-amber-500",   "bg-amber-50",  "5-дневный стрик",   "+50 XP",  (currentUser?.streak||0)>=5],
-      ["fas fa-chart-line text-blue-500","bg-blue-50",  "100 XP набрано",    "+20 XP",  (currentUser?.xp||0)>=100],
-      ["fas fa-brain text-purple-500",  "bg-purple-50", "10 уроков подряд",  "+100 XP", false],
-      ["fas fa-globe text-green-500",   "bg-green-50",  "Изучено 50 слов",   "+75 XP",  false],
-      ["fas fa-fist-raised text-red-500","bg-red-50",   "Первая PvP победа", "+30 XP",  (currentUser?.pvp_wins||0)>=1],
-      ["fas fa-fire text-orange-500",   "bg-orange-50", "Стрик 30 дней",     "+200 XP", (currentUser?.streak||0)>=30],
+      ["fas fa-medal text-amber-500",    "bg-amber-50",  "5-күндүк стрик",  "+50 XP",  (currentUser?.streak||0)>=5],
+      ["fas fa-chart-line text-blue-500","bg-blue-50",   "100 XP жыйналды", "+20 XP",  (currentUser?.xp||0)>=100],
+      ["fas fa-brain text-purple-500",   "bg-purple-50", "10 сабак катары", "+100 XP", false],
+      ["fas fa-globe text-green-500",    "bg-green-50",  "50 сөз үйрөндү",  "+75 XP",  false],
+      ["fas fa-fist-raised text-red-500","bg-red-50",    "Биринчи PvP жеңиш","+30 XP", (currentUser?.pvp_wins||0)>=1],
+      ["fas fa-fire text-orange-500",    "bg-orange-50", "30 күндүк стрик", "+200 XP", (currentUser?.streak||0)>=30],
     ];
     content.innerHTML = `
-      <h3 class="text-xl font-bold mb-4">🏅 Достижения</h3>
+      <h3 class="text-xl font-bold mb-4">🏅 Жетишкендиктер</h3>
       <div class="grid grid-cols-2 gap-4">
         ${achv.map(([icon,bg,title,reward,unlocked]) => `
           <div class="${bg} p-4 rounded-xl text-center ${unlocked?"":"opacity-40 grayscale"}">
             <i class="${icon} text-3xl mb-2"></i>
             <p class="font-medium text-sm">${title}</p>
             <span class="text-xs text-gray-500">${reward}</span>
-            ${unlocked ? '<p class="text-xs text-green-600 mt-1">✓ Получено</p>' : ""}
+            ${unlocked ? '<p class="text-xs text-green-600 mt-1">✓ Алынды</p>' : ""}
           </div>`).join("")}
       </div>`;
-
   } else if (tab === "rating") {
     content.innerHTML = `
       <div class="flex gap-3 mb-4 border-b pb-2">
         ${["global","pvp"].map(s => `
-          <button data-rating-subtab="${s}" class="rating-subtab px-4 py-2 rounded-full text-sm font-medium transition
+          <button data-rating-subtab="${s}"
+                  class="rating-subtab px-4 py-2 rounded-full text-sm font-medium transition
                   ${currentRatingSubtab===s?"bg-green-500 text-white":"bg-gray-100 hover:bg-gray-200"}">
-            ${s==="global"?"🌍 По XP":"⚔️ По ELO"}
+            ${s==="global"?"🌍 XP боюнча":"⚔️ ELO боюнча"}
           </button>`).join("")}
       </div>
       <div id="ratingList"><div class="text-center py-6"><i class="fas fa-spinner fa-spin text-green-500 text-2xl"></i></div></div>`;
@@ -780,18 +1442,17 @@ function showProfileTab(tab) {
       btn.addEventListener("click", () => { currentRatingSubtab = btn.dataset.ratingSubtab; showProfileTab("rating"); });
     });
     loadLeaderboard(currentRatingSubtab);
-
   } else if (tab === "settings") {
     content.innerHTML = `
-      <h3 class="text-xl font-bold mb-4">⚙️ Настройки</h3>
+      <h3 class="text-xl font-bold mb-4">⚙️ Орнотуулар</h3>
       <div class="space-y-5 max-w-sm">
         <div class="text-sm text-gray-500 space-y-1">
           <p>Email: <span class="font-medium text-gray-700">${currentUser?.email||""}</span></p>
-          <p>Верифицирован: <span class="font-medium ${currentUser?.is_verified?"text-green-600":"text-red-500"}">${currentUser?.is_verified?"✓ Да":"✗ Нет"}</span></p>
+          <p>Верификация: <span class="font-medium ${currentUser?.is_verified?"text-green-600":"text-red-500"}">${currentUser?.is_verified?"✓ Ооба":"✗ Жок"}</span></p>
         </div>
         <hr>
         <button id="deleteAvatarBtn" class="text-sm text-red-500 hover:underline flex items-center gap-1">
-          <i class="fas fa-trash-alt"></i> Удалить аватар
+          <i class="fas fa-trash-alt"></i> Аватарды өчүрүү
         </button>
       </div>`;
     document.getElementById("deleteAvatarBtn")?.addEventListener("click", async () => {
@@ -800,7 +1461,7 @@ function showProfileTab(tab) {
         currentUser = data;
         localStorage.setItem("tilzone_user", JSON.stringify(currentUser));
         renderAvatar(); updateUIForAuth();
-        showToast("Аватар удалён");
+        showToast("Аватар өчүрүлдү");
       } catch(err) { showToast(err.message,"error"); }
     });
   }
@@ -811,9 +1472,9 @@ async function saveProfile() {
   const username        = document.getElementById("editUsername")?.value.trim();
   const native_language = document.getElementById("editNativeLang")?.value;
   const study_language  = document.getElementById("editStudyLang")?.value;
-  if (!name)     return showFieldError("editName","Введите имя");
-  if (!username) return showFieldError("editUsername","Введите username");
-  setLoading("saveProfileBtn",true,"Сохранить изменения");
+  if (!name)     return showFieldError("editName","Атыңызды жазыңыз");
+  if (!username) return showFieldError("editUsername","Username жазыңыз");
+  setLoading("saveProfileBtn",true,"Сактоо...");
   try {
     const data = await apiFetch("/user/profile",{ method:"PATCH", json:{ name, username, native_language, study_language } });
     currentUser = data;
@@ -821,13 +1482,13 @@ async function saveProfile() {
     currentStudyLang = study_language;
     localStorage.setItem("tilzone_study_lang", currentStudyLang);
     updateUIForAuth();
-    showToast("Профиль обновлён!");
+    showToast("Профиль жаңыланды!");
   } catch(err) { showToast(err.message,"error"); }
-  finally       { setLoading("saveProfileBtn",false,"Сохранить изменения"); }
+  finally       { setLoading("saveProfileBtn",false,"Өзгөртүүлөрдү сактоо"); }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  ЛИДЕРБОРД
+//  LEADERBOARD
 // ══════════════════════════════════════════════════════════════
 
 async function loadLeaderboard(subtab = "global") {
@@ -835,10 +1496,10 @@ async function loadLeaderboard(subtab = "global") {
   if (!container) return;
   container.innerHTML = `<div class="text-center py-6"><i class="fas fa-spinner fa-spin text-green-500 text-2xl"></i></div>`;
   try {
-    const by   = subtab==="pvp" ? "pvp" : "xp";
+    const by   = subtab === "pvp" ? "pvp" : "xp";
     const data = await apiFetch(`/leaderboard?by=${by}&limit=20`);
     const { entries, my_rank } = data;
-    if (!entries?.length) { container.innerHTML = `<p class="text-center text-gray-400 py-6">Пока никого нет</p>`; return; }
+    if (!entries?.length) { container.innerHTML = `<p class="text-center text-gray-400 py-6">Азырынча эч ким жок</p>`; return; }
     const medals = ["🥇","🥈","🥉"];
     container.innerHTML = `
       <div class="space-y-1">
@@ -851,7 +1512,7 @@ async function loadLeaderboard(subtab = "global") {
                 : `<i class="fas fa-user text-gray-400 text-sm"></i>`}
             </div>
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-sm truncate">${e.name}${e.is_me?" <span class='text-green-600 text-xs'>(вы)</span>":""}</p>
+              <p class="font-medium text-sm truncate">${e.name}${e.is_me?" <span class='text-green-600 text-xs'>(сиз)</span>":""}</p>
               <p class="text-xs text-gray-400">@${e.username} · ${e.league}</p>
             </div>
             <div class="text-right flex-shrink-0">
@@ -864,272 +1525,14 @@ async function loadLeaderboard(subtab = "global") {
             </div>
           </div>`).join("")}
         ${my_rank ? `<div class="mt-3 pt-3 border-t text-center text-sm text-gray-500">
-          Ваше место: <span class="font-bold text-green-600">#${my_rank}</span>
+          Сиздин орун: <span class="font-bold text-green-600">#${my_rank}</span>
         </div>` : ""}
       </div>`;
-  } catch { container.innerHTML = `<p class="text-center text-red-400 py-6">Ошибка загрузки рейтинга</p>`; }
+  } catch { container.innerHTML = `<p class="text-center text-red-400 py-6">Рейтингди жүктөө катасы</p>`; }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  THEORY / MVP / AI
-// ══════════════════════════════════════════════════════════════
-
-function initTheoryPage() {
-  const container = document.getElementById("theoryCategories");
-  if (!container) return;
-  container.innerHTML = theoryCategories.map(c => `
-    <div class="bg-white rounded-2xl p-5 shadow-soft cursor-pointer theory-card hover:shadow-md transition" data-slug="${c.slug}">
-      <h3 class="text-xl font-bold">${c.name}</h3>
-      <p class="text-gray-500 mt-1 text-sm">${c.desc}</p>
-    </div>`).join("");
-  container.querySelectorAll(".theory-card").forEach(c => {
-    c.addEventListener("click", () => {
-      const cat = theoryCategories.find(t => t.slug===c.dataset.slug);
-      if (!cat) return;
-      document.getElementById("modalTitle").innerHTML  = cat.name;
-      document.getElementById("modalContent").innerHTML = cat.content;
-      const m = document.getElementById("theoryModal");
-      m?.classList.remove("hidden"); m?.classList.add("flex");
-    });
-  });
-  document.getElementById("closeModalBtn")?.addEventListener("click", () => {
-    const m = document.getElementById("theoryModal");
-    m?.classList.add("hidden"); m?.classList.remove("flex");
-  });
-}
-
-function initMvpPage() {
-  const mvpDiv = document.getElementById("mvpCard");
-  if (!mvpDiv) return;
-  mvpDiv.innerHTML = `
-    <i class="fas fa-apple-alt text-6xl text-green-500 mb-4"></i>
-    <h2 class="text-2xl font-bold">Урок: Еда</h2>
-    <p class="my-4 text-lg">Переведите слово: <b>Apple</b></p>
-    <div class="flex gap-3 justify-center flex-wrap">
-      <button class="mvp-answer bg-green-50 px-6 py-3 rounded-xl hover:bg-green-100 border-2 border-transparent transition" data-correct="true">🍎 Яблоко</button>
-      <button class="mvp-answer bg-gray-50  px-6 py-3 rounded-xl hover:bg-gray-100  border-2 border-transparent transition">🍐 Груша</button>
-      <button class="mvp-answer bg-gray-50  px-6 py-3 rounded-xl hover:bg-gray-100  border-2 border-transparent transition">🍊 Апельсин</button>
-    </div>
-    <button id="mvpNext" class="mt-6 bg-green-500 text-white px-8 py-3 rounded-full hover:bg-green-600 hidden">Далее →</button>`;
-  mvpDiv.querySelectorAll(".mvp-answer").forEach(btn => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      mvpDiv.querySelectorAll(".mvp-answer").forEach(b => b.disabled = true);
-      if (btn.dataset.correct) { btn.classList.add("bg-green-400","text-white","border-green-500"); showToast("+5 XP!"); }
-      else                     { btn.classList.add("bg-red-100","border-red-400"); mvpDiv.querySelector("[data-correct]")?.classList.add("bg-green-300","border-green-500"); showToast("Неверно. Правильно: Яблоко","error"); }
-      document.getElementById("mvpNext")?.classList.remove("hidden");
-    });
-  });
-}
-
-// Список ошибок за сессию
-let sessionErrors = [];
-
-function initAIPage() {
-  sessionErrors = [];
-  renderAIScenarios();
-  renderHistoryPanel();
-
-  // Заголовок сценария в шапке чата
-  setElText("chatScenarioTitle", currentScenario.name);
-
-  document.getElementById("sendChatBtn")?.addEventListener("click", sendAIMessage);
-  document.getElementById("chatInput")?.addEventListener("keydown", e => { if (e.key === "Enter") sendAIMessage(); });
-  document.getElementById("voiceBtn")?.addEventListener("click",    () => showToast("🎤 Голосовой ввод скоро появится", "info"));
-
-  document.getElementById("clearChatBtn")?.addEventListener("click", () => {
-    chatHistory   = [...currentScenario.dialog];
-    sessionErrors = [];
-    const bar = document.getElementById("errorAnalysisBar");
-    if (bar) bar.classList.add("hidden");
-    renderChat();
-    renderHistoryPanel();
-  });
-
-  document.getElementById("loadHistoryBtn")?.addEventListener("click", loadAIHistory);
-  renderLevelHints();
-}
-
-async function sendAIMessage() {
-  if (!currentUser) { showAuthModal(); return; }
-
-  const inp  = document.getElementById("chatInput");
-  const text = inp?.value.trim();
-  if (!text) return;
-
-  // Добавляем сообщение пользователя
-  chatHistory.push({ role: "user", text });
-  inp.value = "";
-
-  // Typing-индикатор
-  chatHistory.push({ role: "assistant", text: "...", typing: true });
-  renderChat();
-
-  // Строим историю для API (только реальные сообщения, без typing/correction)
-  const historyForApi = chatHistory
-    .filter(m => !m.typing && !m.correction && (m.role === "user" || m.role === "assistant"))
-    .slice(-20)   // не более 20 сообщений
-    .slice(0, -1)  // без последнего (текущего) — оно идёт в поле message
-    .map(m => ({ role: m.role, content: m.text }));
-
-  try {
-    const data = await apiFetch("/ai/chat", {
-      method: "POST",
-      json: {
-        message:  text,
-        scenario: currentScenario.name,
-        history:  historyForApi,
-      },
-    });
-
-    chatHistory = chatHistory.filter(m => !m.typing);
-    chatHistory.push({ role: "assistant", text: data.response });
-
-    // Показываем исправление отдельным сообщением
-    if (data.correction) {
-      chatHistory.push({ role: "assistant", text: `✏️ ${data.correction}`, correction: true });
-      sessionErrors.push({ original: text, corrected: data.correction });
-      // Показываем панель анализа ошибок
-      const bar = document.getElementById("errorAnalysisBar");
-      const txt = document.getElementById("errorAnalysisText");
-      if (bar && txt) { txt.innerText = data.correction; bar.classList.remove("hidden"); }
-    }
-
-    // Обновляем уровень-бейдж
-    if (data.level_hint) {
-      const badge = document.getElementById("aiLevelBadge");
-      if (badge) { badge.innerText = data.level_hint; badge.classList.remove("hidden"); }
-    }
-
-    // XP
-    if (data.earned_xp > 0 && currentUser) {
-      currentUser.xp    = (currentUser.xp || 0) + data.earned_xp;
-      currentUser.level = Math.floor(currentUser.xp / 100) + 1;
-      localStorage.setItem("tilzone_user", JSON.stringify(currentUser));
-      updateUIForAuth();
-      showToast(`+${data.earned_xp} XP!`);
-    }
-
-    renderHistoryPanel();
-  } catch(err) {
-    chatHistory = chatHistory.filter(m => !m.typing);
-    const msg = err.status === 503
-      ? "⚠️ AI не настроен. Добавьте ANTHROPIC_API_KEY в .env бэкенда."
-      : "⚠️ Ошибка соединения с сервером.";
-    chatHistory.push({ role: "assistant", text: msg, error: true });
-  }
-
-  renderChat();
-}
-
-function renderAIScenarios() {
-  const div = document.getElementById("scenarioList");
-  if (!div) return;
-  div.innerHTML = aiScenarios.map(s => `
-    <div class="p-2 rounded-xl hover:bg-green-50 cursor-pointer scenario-item text-sm
-                ${s.id === currentScenario.id ? "bg-green-50 text-green-700 font-medium" : ""}"
-         data-id="${s.id}">${s.name}</div>`).join("");
-
-  div.querySelectorAll(".scenario-item").forEach(el => {
-    el.addEventListener("click", () => {
-      currentScenario = aiScenarios.find(s => s.id === parseInt(el.dataset.id));
-      chatHistory     = [...currentScenario.dialog];
-      sessionErrors   = [];
-      setElText("chatScenarioTitle", currentScenario.name);
-      renderAIScenarios();
-      renderChat();
-      renderErrorsPanel();
-      renderHistoryPanel();
-    });
-  });
-
-  renderChat();
-}
-
-function renderChat() {
-  const chatDiv = document.getElementById("chatMessages");
-  if (!chatDiv) return;
-  chatDiv.innerHTML = chatHistory.map(msg => {
-    const isUser = msg.role === "user";
-    const cls = msg.typing     ? "bg-gray-100 italic text-gray-400 animate-pulse"
-              : msg.error      ? "bg-red-50 text-red-600 border border-red-200"
-              : isUser         ? "bg-green-500 text-white"
-              : msg.correction ? "bg-amber-50 border border-amber-200 text-amber-800 text-xs"
-              : "bg-gray-100 text-gray-800";
-    return `<div class="flex ${isUser ? "justify-end" : "justify-start"}">
-      <div class="max-w-[80%] p-3 rounded-2xl text-sm leading-relaxed ${cls}">${msg.text}</div>
-    </div>`;
-  }).join("");
-  chatDiv.scrollTop = chatDiv.scrollHeight;
-}
-
-function renderErrorsPanel() {
-  const el = document.getElementById("errorsList");
-  if (!el) return;
-  if (!sessionErrors.length) {
-    el.innerHTML = `<p class="italic text-gray-400 text-xs">Ошибок не найдено — отлично!</p>`;
-    return;
-  }
-  el.innerHTML = sessionErrors.map((e, i) => `
-    <div class="bg-red-50 rounded-xl p-2 text-xs border border-red-100">
-      <p class="text-red-400 line-through">${e.original}</p>
-      <p class="text-green-700 font-medium mt-0.5">✓ ${e.corrected}</p>
-    </div>`).join("");
-}
-
-function renderHistoryPanel() {
-  const el = document.getElementById("historyList");
-  if (!el) return;
-  const userMessages = chatHistory.filter(m => m.role === "user" && !m.typing).slice(-6);
-  if (!userMessages.length) { el.innerHTML = `<p class="text-gray-400 text-xs italic">Пока пусто</p>`; return; }
-  el.innerHTML = userMessages.map(m => `
-    <div class="truncate text-xs text-gray-500 py-0.5">— ${m.text}</div>`).join("");
-}
-
-
-async function loadAIHistory() {
-  const el = document.getElementById("historyList");
-  if (!el) return;
-  if (!currentUser) { el.innerHTML = `<p class="text-xs text-gray-400 italic">Войдите, чтобы увидеть историю</p>`; return; }
-  el.innerHTML = `<i class="fas fa-spinner fa-spin text-green-400"></i>`;
-  try {
-    const items = await apiFetch("/ai/history?limit=10");
-    if (!items?.length) { el.innerHTML = `<p class="text-xs text-gray-400 italic">История пуста</p>`; return; }
-    el.innerHTML = items.map(item => `
-      <div class="text-xs border rounded-xl p-2 hover:bg-gray-50 cursor-pointer history-item" data-response="${encodeURIComponent(item.response)}">
-        <p class="font-medium text-gray-600 truncate">${item.scenario}</p>
-        <p class="text-gray-400 truncate mt-0.5">— ${item.message}</p>
-      </div>`).join("");
-    el.querySelectorAll(".history-item").forEach(item => {
-      item.addEventListener("click", () => {
-        const resp = decodeURIComponent(item.dataset.response);
-        chatHistory.push({ role: "assistant", text: `📖 Из истории: ${resp}` });
-        renderChat();
-      });
-    });
-  } catch { el.innerHTML = `<p class="text-xs text-red-400">Ошибка загрузки</p>`; }
-}
-
-function renderLevelHints() {
-  const el = document.getElementById("levelHints");
-  if (!el) return;
-  const xp    = currentUser?.xp || 0;
-  const level = xp < 100 ? "A1" : xp < 300 ? "A2" : xp < 700 ? "B1" : xp < 1500 ? "B2" : "C1";
-  const hints = {
-    A1: ["Начните: Hello! / Good morning!", "Спросите: What is your name?", "Ответьте: My name is ..."],
-    A2: ["Используйте: Can I have...?", "Спросите: How much does it cost?", "Опишите: I would like to..."],
-    B1: ["Расскажите о себе подробнее", "Используйте прошедшее время", "Спросите мнение: What do you think?"],
-    B2: ["Используйте идиомы", "Аргументируйте своё мнение", "Говорите развёрнутыми фразами"],
-    C1: ["Обсудите абстрактные темы", "Используйте сослагательное наклонение", "Делайте комплексные высказывания"],
-  };
-  const list = hints[level] || hints.A1;
-  el.innerHTML = `
-    <p class="text-xs font-semibold text-green-600 mb-2">Уровень: ${level}</p>
-    ${list.map(h => `<p class="text-xs text-gray-500">• ${h}</p>`).join("")}`;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  SPA-РОУТИНГ
+//  SPA ROUTER
 // ══════════════════════════════════════════════════════════════
 
 const PAGE_INIT_MAP = {
@@ -1143,13 +1546,13 @@ const PAGE_INIT_MAP = {
   lesson:   initLessonPage,
   ai:       initAIPage,
   theory:   initTheoryPage,
-  mvp:      initMvpPage,
+  mvp:      initPvPPage,
 };
 
 async function loadPage(pageName) {
   const container = document.querySelector("#app-content .container-custom");
   if (!container) return;
-  container.innerHTML = `<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-5xl text-green-500 mb-4"></i><p data-i18n="loading">Загрузка...</p></div>`;
+  container.innerHTML = `<div class="text-center py-20"><i class="fas fa-spinner fa-spin text-5xl text-green-500 mb-4"></i></div>`;
   try {
     const res = await fetch(`pages/${pageName}.html`);
     if (!res.ok) throw new Error();
@@ -1157,8 +1560,8 @@ async function loadPage(pageName) {
   } catch {
     container.innerHTML = `<div class="text-center py-20">
       <i class="fas fa-exclamation-triangle text-6xl text-red-400 mb-4"></i>
-      <h1 class="text-2xl font-bold">Страница не найдена</h1>
-      <a href="#" data-page="home" class="mt-4 inline-block bg-green-500 text-white px-6 py-2 rounded-xl">На главную</a>
+      <h1 class="text-2xl font-bold">Барак табылган жок</h1>
+      <a href="#" data-page="home" class="mt-4 inline-block bg-green-500 text-white px-6 py-2 rounded-xl">Башкы бетке</a>
     </div>`;
     attachNavLinks(); return;
   }
@@ -1184,21 +1587,23 @@ function attachNavLinks() {
       e.preventDefault();
       const page = link.dataset.page;
       if (!page) return;
-      if (page==="profile" && !currentUser) { showAuthModal(); return; }
+      if (page === "profile" && !currentUser) { showAuthModal(); return; }
       loadPage(page);
     });
   });
 }
 
 // ══════════════════════════════════════════════════════════════
-//  ИНИЦИАЛИЗАЦИЯ
+//  INIT
 // ══════════════════════════════════════════════════════════════
 
 document.addEventListener("DOMContentLoaded", () => {
   applyUILanguage(currentLang);
   attachNavLinks();
+
   document.getElementById("modalLoginBtn")?.addEventListener("click",    () => { hideAuthModal(); loadPage("login");    });
   document.getElementById("modalRegisterBtn")?.addEventListener("click", () => { hideAuthModal(); loadPage("register"); });
+
   document.getElementById("langBtn")?.addEventListener("click", e => {
     e.stopPropagation();
     document.getElementById("langDropdown")?.classList.toggle("hidden");
@@ -1212,6 +1617,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.addEventListener("click", () => document.getElementById("langDropdown")?.classList.add("hidden"));
   window.addEventListener("popstate", e => loadPage(e.state?.page || "home"));
+
   loadPage(window.location.hash.slice(1) || "home");
   updateUIForAuth();
 });

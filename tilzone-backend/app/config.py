@@ -24,10 +24,15 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5500"
     )
 
-    # Anthropic
-    anthropic_api_key: str = ""
-    ai_model: str = "claude-sonnet-4-6"
-    ai_max_tokens: int = 1024
+    # AI Provider: "ollama" (local) or "groq" (cloud)
+    ai_provider: str = "ollama"
+
+    # Ollama (local)
+    ollama_model: str = "qwen3:8b"
+
+    # Groq (cloud, free)
+    groq_api_key: str = ""
+    groq_model: str = "qwen-3-8b"
 
     smtp_host: str = ""
     smtp_port: int = 587

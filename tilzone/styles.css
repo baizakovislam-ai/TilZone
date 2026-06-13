@@ -1,12 +1,11 @@
-/* styles.css - полная версия, без сокращений */
+/* styles.css */
 
-/* Глобальные стили */
+/* ── Base ─────────────────────────────────────────────────── */
 body {
     background: linear-gradient(145deg, #fafcff 0%, #eef6ee 100%);
     font-family: 'Inter', sans-serif;
 }
 
-/* Контейнер с отступами для разных экранов */
 .container-custom {
     max-width: 1280px;
     margin-left: auto;
@@ -14,167 +13,217 @@ body {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
 }
-
 @media (min-width: 1024px) {
-    .container-custom {
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
+    .container-custom { padding-left: 2rem; padding-right: 2rem; }
 }
 
-/* Линии между уроками в пути обучения */
+/* ── Learning path ────────────────────────────────────────── */
 .learning-line {
-    width: 3px;
-    height: 48px;
+    width: 3px; height: 48px;
     background: #e2e8f0;
     transition: background 0.3s;
 }
-
 @media (min-width: 768px) {
-    .learning-line {
-        width: 56px;
-        height: 3px;
-    }
+    .learning-line { width: 56px; height: 3px; }
 }
+.learning-line.completed { background: #22c55e; }
 
-.learning-line.completed {
-    background: #22c55e;
-}
-
-/* Анимация доступного урока */
 @keyframes softPulse {
-    0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(34,197,94,0.4);
-    }
-    50% {
-        transform: scale(1.03);
-        box-shadow: 0 0 0 10px rgba(34,197,94,0);
-    }
+    0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0   rgba(34,197,94,0.4); }
+    50%       { transform: scale(1.04); box-shadow: 0 0 0 10px rgba(34,197,94,0);   }
 }
+.lesson-available { animation: softPulse 2s infinite; }
 
-.lesson-available {
-    animation: softPulse 2s infinite;
-}
-
-/* Стили для ячеек ввода кода подтверждения */
+/* ── Code / verify inputs ─────────────────────────────────── */
 .code-digit {
-    width: 3.5rem;
-    height: 4rem;
-    font-size: 1.8rem;
-    font-weight: 700;
+    width: 3.5rem; height: 4rem;
+    font-size: 1.8rem; font-weight: 700;
     text-align: center;
     border-radius: 1rem;
     background: #f3f4f6;
     border: 1px solid #e5e7eb;
 }
+.code-digit:focus { outline: none; border-color: #22c55e; }
 
-.code-digit:focus {
-    outline: none;
-    border-color: #22c55e;
-    ring: 2px solid #22c55e;
-}
-
-/* Анимация появления страниц */
+/* ── Animations ───────────────────────────────────────────── */
 @keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
+.page-transition { animation: fadeUp 0.35s ease-out; }
 
-.page-transition {
-    animation: fadeUp 0.35s ease-out;
+@keyframes popIn {
+    0%   { transform: scale(0.85); opacity: 0; }
+    70%  { transform: scale(1.04); }
+    100% { transform: scale(1);    opacity: 1; }
 }
+.pop-in { animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
 
-/* Активные табы профиля */
+/* ── Profile tabs ─────────────────────────────────────────── */
 .profile-tab {
     border-bottom: 2px solid transparent;
-    transition: 0.2s;
-    cursor: pointer;
+    transition: 0.2s; cursor: pointer;
 }
-
 .profile-tab.active {
     border-bottom-color: #22c55e;
-    color: #166534;
-    font-weight: 600;
+    color: #166534; font-weight: 600;
 }
 
-/* Активная кнопка нижней навигации */
-.bottom-nav-item.active {
-    color: #22c55e;
-    background: #dcfce7;
-}
+/* ── Bottom nav ───────────────────────────────────────────── */
+.bottom-nav-item.active { color: #22c55e; background: #dcfce7; }
 
-/* Прогресс XP с плавностью */
-.xp-progress {
-    transition: width 0.5s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-}
+/* ── XP bar ───────────────────────────────────────────────── */
+.xp-progress { transition: width 0.5s cubic-bezier(0.2,0.9,0.4,1.1); }
 
-/* Карточка оценки (hover-эффект) */
-.score-card {
-    transition: all 0.2s;
-}
+/* ── Score card ───────────────────────────────────────────── */
+.score-card { transition: all 0.2s; }
+.score-card:hover { transform: translateY(-2px); }
 
-.score-card:hover {
-    transform: translateY(-2px);
-}
-
-/* Скелетон для загрузки */
+/* ── Skeleton ─────────────────────────────────────────────── */
 .skeleton {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background: linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);
     background-size: 200% 100%;
     animation: loading 1.5s infinite;
 }
-
 @keyframes loading {
-    0% {
-        background-position: 200% 0;
-    }
-    100% {
-        background-position: -200% 0;
-    }
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
-/* Кастомный скролл для контейнеров с горизонтальной прокруткой */
-.custom-scroll::-webkit-scrollbar {
-    height: 4px;
-    width: 4px;
-}
+/* ── Custom scrollbar ─────────────────────────────────────── */
+.custom-scroll::-webkit-scrollbar       { height: 4px; width: 4px; }
+.custom-scroll::-webkit-scrollbar-track { background: #e4e4e7; border-radius: 10px; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #22c55e;  border-radius: 10px; }
 
-.custom-scroll::-webkit-scrollbar-track {
-    background: #e4e4e7;
-    border-radius: 10px;
-}
+/* ── Theory content (modal / inline) ─────────────────────── */
+.theory-content h4      { font-weight: 700; margin: 0.8rem 0 0.4rem; font-size: 0.95rem; }
+.theory-content p       { margin: 0.4rem 0; font-size: 0.9rem; line-height: 1.6; }
+.theory-content ul      { list-style: disc inside; padding-left: 0.5rem; margin: 0.4rem 0; }
+.theory-content li      { margin: 0.2rem 0; font-size: 0.875rem; }
+.theory-content em      { color: #16a34a; font-style: normal; font-weight: 600; }
 
-.custom-scroll::-webkit-scrollbar-thumb {
-    background: #22c55e;
-    border-radius: 10px;
+.theory-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.82rem; margin: 0.6rem 0;
 }
-
-/* Адаптивность для кругов обучения на мобильных (меньше отступы) */
-@media (max-width: 640px) {
-    .learning-line {
-        height: 32px;
-    }
-    .learning-node {
-        width: 3rem;
-        height: 3rem;
-        font-size: 1.25rem;
-    }
+.theory-table th {
+    background: #f0fdf4; color: #166534;
+    padding: 6px 10px; text-align: left;
+    border: 1px solid #bbf7d0; font-weight: 600;
 }
-
-/* Стили для модалок теории */
-#theoryModal .prose {
-    max-width: none;
+.theory-table td {
+    padding: 5px 10px;
+    border: 1px solid #e5e7eb;
 }
+.theory-table tr:nth-child(even) td { background: #f9fafb; }
 
-/* Для формы верификации автоматический фокус */
-.code-digit:focus-visible {
+/* ── Task card choice buttons ─────────────────────────────── */
+.choice-btn {
+    border: 2px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-size: 0.9rem;
+    transition: all 0.15s;
+    background: #fff;
+    cursor: pointer;
+    width: 100%;
+}
+.choice-btn:hover:not(:disabled)        { border-color: #86efac; background: #f0fdf4; }
+.choice-btn.correct                     { border-color: #22c55e; background: #dcfce7; color: #166534; font-weight: 600; }
+.choice-btn.wrong                       { border-color: #f87171; background: #fef2f2; color: #dc2626; }
+.choice-btn.reveal                      { border-color: #22c55e; background: #dcfce7; opacity: 0.8; }
+.choice-btn:disabled                    { cursor: default; }
+
+/* ── Fill-in-blank input ──────────────────────────────────── */
+.fill-input {
+    border: 2px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 0.7rem 1rem;
+    font-size: 1rem;
+    width: 100%;
+    transition: border-color 0.15s;
     outline: none;
-    ring: 2px solid #22c55e;
 }
+.fill-input:focus              { border-color: #4ade80; }
+.fill-input.correct            { border-color: #22c55e; background: #dcfce7; }
+.fill-input.wrong              { border-color: #f87171; background: #fef2f2; }
+
+/* ── Feedback banner ──────────────────────────────────────── */
+.feedback-correct { background:#dcfce7; color:#166534; border:1px solid #86efac; border-radius:0.75rem; padding:0.75rem 1rem; font-size:0.9rem; }
+.feedback-wrong   { background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; border-radius:0.75rem; padding:0.75rem 1rem; font-size:0.9rem; }
+
+/* ── Category filter pills ────────────────────────────────── */
+.cat-filter {
+    border: 1.5px solid #e5e7eb;
+    transition: all 0.15s;
+}
+.cat-filter.active {
+    background: #22c55e; color: #fff;
+    border-color: #22c55e;
+}
+
+/* ── Theory card (grid) ───────────────────────────────────── */
+.theory-card {
+    cursor: pointer; transition: all 0.2s;
+    border: 1.5px solid #f3f4f6;
+}
+.theory-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px -8px rgba(0,0,0,0.1);
+    border-color: #86efac;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .learning-line { height: 32px; }
+}
+
+/* ── Task card pop-in animation ───────────────────────────── */
+@keyframes popIn {
+    0%   { opacity: 0; transform: scale(0.96) translateY(6px); }
+    100% { opacity: 1; transform: scale(1)    translateY(0); }
+}
+.pop-in { animation: popIn 0.3s ease-out; }
+
+/* ── Skeleton loader ──────────────────────────────────────── */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.4s infinite;
+}
+@keyframes skeleton-loading {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ── Prose tables inside theory modal ─────────────────────── */
+#theoryModalBody table {
+    width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 0.75rem 0;
+}
+#theoryModalBody th {
+    background: #f0fdf4; color: #166534; padding: 7px 12px;
+    border: 1px solid #bbf7d0; font-weight: 600; text-align: left;
+}
+#theoryModalBody td {
+    padding: 6px 12px; border: 1px solid #e5e7eb;
+}
+#theoryModalBody tr:nth-child(even) td { background: #f9fafb; }
+#theoryModalBody h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+#theoryModalBody h4 { font-size: 0.95rem; font-weight: 600; margin: 0.75rem 0 0.3rem; color: #374151; }
+#theoryModalBody ul { list-style: disc inside; padding-left: 0.5rem; }
+#theoryModalBody li { margin: 0.2rem 0; font-size: 0.875rem; }
+#theoryModalBody p  { margin: 0.4rem 0; line-height: 1.6; font-size: 0.9rem; }
+#theoryModalBody b  { color: #166534; }
+#theoryModalBody em { color: #16a34a; font-style: normal; font-weight: 600; }
+#theoryModalBody code { background: #f0fdf4; padding: 1px 5px; border-radius: 4px; font-size: 0.85em; }
+
+/* Same for lesson theory panel */
+#theoryContent h3, #theoryContent h4 { font-weight: 700; margin: 0.5rem 0 0.25rem; }
+#theoryContent table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+#theoryContent th { background: #eff6ff; padding: 6px 10px; border: 1px solid #bfdbfe; font-weight: 600; }
+#theoryContent td { padding: 5px 10px; border: 1px solid #e5e7eb; }
+#theoryContent p  { margin: 0.35rem 0; font-size: 0.875rem; line-height: 1.55; }
+#theoryContent ul { list-style: disc inside; padding-left: 0.5rem; }
+#theoryContent li { font-size: 0.85rem; margin: 0.15rem 0; }
+#theoryContent b  { color: #1e40af; }

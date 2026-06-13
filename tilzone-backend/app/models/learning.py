@@ -13,6 +13,8 @@ class Lesson(Base):
     section: Mapped[str] = mapped_column(String(120), default="Beginner", nullable=False)
     xp_reward: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class Theory(Base):
@@ -24,6 +26,10 @@ class Theory(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     examples: Mapped[str] = mapped_column(Text, default="", nullable=False)
     lesson_id: Mapped[int | None] = mapped_column(ForeignKey("lessons.id"), nullable=True)
+    audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
 class Task(Base):
@@ -32,9 +38,14 @@ class Task(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id"), nullable=False)
     task_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # task_type: translate | choice | fill | matching | speaking | listening
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
+    # options: JSON array for choice tasks, e.g. ["goes","go","going","gone"]
+    options: Mapped[str | None] = mapped_column(Text, nullable=True)
     xp_reward: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class UserProgress(Base):
