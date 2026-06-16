@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TilZone — Админ панель</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    borderRadius: { '3xl': '1.5rem' },
+                    boxShadow: { 'soft': '0 12px 30px -8px rgba(0,0,0,0.08)' }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f0fdf4; }
+        .sidebar-link { transition: all 0.15s; border-radius: 0.75rem; }
+        .sidebar-link:hover { background: #dcfce7; color: #15803d; }
+        .sidebar-link.active { background: #22c55e; color: white; font-weight: 600; }
+        .sidebar-link.active i { color: white; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .stat-card { transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-red { background: #fee2e2; color: #991b1b; }
+        .badge-yellow { background: #fef9c3; color: #854d0e; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-gray { background: #f3f4f6; color: #4b5563; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .modal-box { background: white; border-radius: 1.25rem; padding: 2rem; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+        .form-input { width: 100%; border: 1px solid #e5e7eb; border-radius: 0.625rem; padding: 0.5rem 0.875rem; font-size: 0.9rem; outline: none; transition: border-color 0.15s; }
+        .form-input:focus { border-color: #22c55e; }
+        .form-label { font-size: 0.8rem; font-weight: 600; color: #374151; margin-bottom: 4px; display: block; }
+        .btn { display: inline-flex; align-items: center; gap: 6px; padding: 0.45rem 1rem; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn-green { background: #22c55e; color: white; }
+        .btn-green:hover { background: #16a34a; }
+        .btn-red { background: #ef4444; color: white; }
+        .btn-red:hover { background: #dc2626; }
+        .btn-gray { background: #f3f4f6; color: #374151; }
+        .btn-gray:hover { background: #e5e7eb; }
+        .btn-outline { border: 1.5px solid #22c55e; color: #16a34a; background: white; }
+        .btn-outline:hover { background: #f0fdf4; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th { background: #f9fafb; font-size: 0.75rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 14px; text-align: left; }
+        tbody tr { border-top: 1px solid #f3f4f6; }
+        tbody tr:hover { background: #f9fafb; }
+        tbody td { padding: 10px 14px; font-size: 0.875rem; color: #374151; }
+        .pagination { display: flex; gap: 6px; align-items: center; }
+        .page-btn { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; cursor: pointer; border: 1px solid #e5e7eb; background: white; }
+        .page-btn.active { background: #22c55e; color: white; border-color: #22c55e; }
+        .page-btn:hover:not(.active) { background: #f0fdf4; }
+        #toast { position: fixed; bottom: 24px; right: 24px; z-index: 200; }
+        .toast-item { padding: 12px 20px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; color: white; margin-top: 8px; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .section { display: none; }
+        .section.active { display: block; }
+        select.form-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px; }
+        #loginScreen { position: fixed; inset: 0; background: linear-gradient(145deg, #f0fdf4, #dcfce7); z-index: 300; display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen">
+    <div class="card p-8 w-full max-w-sm">
+        <div class="text-center mb-6">
+            <div class="text-3xl font-black bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent mb-1">TilZone</div>
+            <div class="text-gray-500 text-sm">Панель администратора</div>
+        </div>
+        <div id="loginError" class="hidden mb-4 p-3 bg-red-50 text-red-700 rounded-xl text-sm font-medium"></div>
+        <div class="space-y-4">
+            <div>
+                <label class="form-label">Логин или Email</label>
+                <input id="loginInput" type="text" class="form-input" placeholder="admin" />
+            </div>
+            <div>
+                <label class="form-label">Пароль</label>
+                <input id="passwordInput" type="password" class="form-input" placeholder="••••••••" />
+            </div>
+            <button onclick="doLogin()" class="btn btn-green w-full justify-center py-2.5">
+                <i class="fas fa-sign-in-alt"></i> Войти
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Main Layout -->
+<div id="adminApp" class="hidden flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-60 min-h-screen bg-white border-r border-gray-100 flex flex-col py-6 px-4 fixed top-0 left-0 z-40" style="height:100vh;overflow-y:auto">
+        <div class="mb-8 px-2">
+            <div class="text-xl font-black bg-gradient-to-r from-green-600 to-emerald-500 bg-clip-text text-transparent">TilZone</div>
+            <div class="text-xs text-gray-400 mt-0.5">Admin Panel</div>
+        </div>
+        <nav class="flex flex-col gap-1 flex-1">
+            <button onclick="showSection('dashboard')" class="sidebar-link active flex items-center gap-3 px-4 py-2.5 text-sm text-left" id="nav-dashboard">
+                <i class="fas fa-chart-pie w-4 text-green-600"></i> Дашборд
+            </button>
+            <button onclick="showSection('users')" class="sidebar-link flex items-center gap-3 px-4 py-2.5 text-sm text-left" id="nav-users">
+                <i class="fas fa-users w-4 text-green-600"></i> Пользователи
+            </button>
+            <button onclick="showSection('lessons')" class="sidebar-link flex items-center gap-3 px-4 py-2.5 text-sm text-left" id="nav-lessons">
+                <i class="fas fa-book-open w-4 text-green-600"></i> Уроки
+            </button>
+            <button onclick="showSection('tasks')" class="sidebar-link flex items-center gap-3 px-4 py-2.5 text-sm text-left" id="nav-tasks">
+                <i class="fas fa-tasks w-4 text-green-600"></i> Задания
+            </button>
+            <button onclick="showSection('theory')" class="sidebar-link flex items-center gap-3 px-4 py-2.5 text-sm text-left" id="nav-theory">
+                <i class="fas fa-graduation-cap w-4 text-green-600"></i> Теория
+            </button>
+        </nav>
+        <div class="pt-4 border-t border-gray-100">
+            <div class="text-xs text-gray-400 px-2 mb-2" id="adminLabel">—</div>
+            <button onclick="doLogout()" class="sidebar-link flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 w-full text-left">
+                <i class="fas fa-sign-out-alt w-4"></i> Выйти
+            </button>
+        </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="ml-60 flex-1 p-8">
+
+        <!-- ── Dashboard ─────────────────────────────────── -->
+        <div id="section-dashboard" class="section active">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">Дашборд</h1>
+
+            <!-- Stat cards -->
+            <div id="statCards" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="card p-5 stat-card">
+                    <div class="text-xs text-gray-400 font-semibold uppercase mb-1">Пользователей</div>
+                    <div id="stat-users" class="text-3xl font-black text-gray-800">—</div>
+                    <div id="stat-users-sub" class="text-xs text-gray-400 mt-1"></div>
+                </div>
+                <div class="card p-5 stat-card">
+                    <div class="text-xs text-gray-400 font-semibold uppercase mb-1">Уроков</div>
+                    <div id="stat-lessons" class="text-3xl font-black text-gray-800">—</div>
+                    <div id="stat-lessons-sub" class="text-xs text-gray-400 mt-1"></div>
+                </div>
+                <div class="card p-5 stat-card">
+                    <div class="text-xs text-gray-400 font-semibold uppercase mb-1">Заданий</div>
+                    <div id="stat-tasks" class="text-3xl font-black text-gray-800">—</div>
+                    <div id="stat-tasks-sub" class="text-xs text-gray-400 mt-1"></div>
+                </div>
+                <div class="card p-5 stat-card">
+                    <div class="text-xs text-gray-400 font-semibold uppercase mb-1">XP заработано</div>
+                    <div id="stat-xp" class="text-3xl font-black text-green-600">—</div>
+                    <div id="stat-pvp" class="text-xs text-gray-400 mt-1"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Top users -->
+                <div class="card p-5">
+                    <div class="font-bold text-gray-700 mb-4">🏆 Топ пользователей по XP</div>
+                    <div id="topUsersList" class="space-y-3"></div>
+                </div>
+                <!-- Recent registrations -->
+                <div class="card p-5">
+                    <div class="font-bold text-gray-700 mb-4">🆕 Последние регистрации</div>
+                    <div id="recentUsersList" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Users ─────────────────────────────────────── -->
+        <div id="section-users" class="section">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Пользователи</h1>
+                <button onclick="openUserModal()" class="btn btn-green"><i class="fas fa-plus"></i> Создать</button>
+            </div>
+            <!-- Filters -->
+            <div class="card p-4 mb-4 flex flex-wrap gap-3 items-center">
+                <input id="userSearch" type="text" placeholder="Поиск по имени, email..." class="form-input" style="max-width:260px" oninput="debounce(loadUsers,400)()">
+                <select id="userRoleFilter" class="form-input" style="max-width:160px" onchange="loadUsers()">
+                    <option value="">Все роли</option>
+                    <option value="user">user</option>
+                    <option value="admin">admin</option>
+                </select>
+                <select id="userActiveFilter" class="form-input" style="max-width:160px" onchange="loadUsers()">
+                    <option value="">Любой статус</option>
+                    <option value="true">Активен</option>
+                    <option value="false">Заблокирован</option>
+                </select>
+            </div>
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Пользователь</th>
+                                <th>Email</th>
+                                <th>Роль</th>
+                                <th>XP / Level</th>
+                                <th>Статус</th>
+                                <th>Дата</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr><td colspan="7" class="text-center text-gray-400 py-8">Загрузка...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-gray-100 flex items-center justify-between">
+                    <div id="usersPagInfo" class="text-sm text-gray-400"></div>
+                    <div id="usersPagination" class="pagination"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Lessons ────────────────────────────────────── -->
+        <div id="section-lessons" class="section">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Уроки</h1>
+                <button onclick="openLessonModal()" class="btn btn-green"><i class="fas fa-plus"></i> Создать</button>
+            </div>
+            <div class="card p-4 mb-4 flex flex-wrap gap-3 items-center">
+                <input id="lessonSearch" type="text" placeholder="Поиск по названию..." class="form-input" style="max-width:260px" oninput="debounce(loadLessons,400)()">
+                <select id="lessonLevelFilter" class="form-input" style="max-width:130px" onchange="loadLessons()">
+                    <option value="">Все уровни</option>
+                    <option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option>
+                </select>
+                <select id="lessonPublishedFilter" class="form-input" style="max-width:160px" onchange="loadLessons()">
+                    <option value="">Любой статус</option>
+                    <option value="true">Опубликован</option>
+                    <option value="false">Черновик</option>
+                </select>
+            </div>
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Название</th>
+                                <th>Уровень</th>
+                                <th>Секция</th>
+                                <th>XP</th>
+                                <th>Заданий</th>
+                                <th>Статус</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="lessonsTableBody">
+                            <tr><td colspan="8" class="text-center text-gray-400 py-8">Загрузка...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-gray-100 flex items-center justify-between">
+                    <div id="lessonsPagInfo" class="text-sm text-gray-400"></div>
+                    <div id="lessonsPagination" class="pagination"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Tasks ─────────────────────────────────────── -->
+        <div id="section-tasks" class="section">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Задания</h1>
+                <button onclick="openTaskModal()" class="btn btn-green"><i class="fas fa-plus"></i> Создать</button>
+            </div>
+            <div class="card p-4 mb-4 flex flex-wrap gap-3 items-center">
+                <input id="taskLessonFilter" type="number" placeholder="ID урока..." class="form-input" style="max-width:140px" oninput="debounce(loadTasks,400)()">
+                <select id="taskTypeFilter" class="form-input" style="max-width:160px" onchange="loadTasks()">
+                    <option value="">Все типы</option>
+                    <option>translate</option><option>choice</option><option>fill</option>
+                    <option>matching</option><option>speaking</option><option>listening</option>
+                </select>
+            </div>
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Урок</th>
+                                <th>Тип</th>
+                                <th>Вопрос</th>
+                                <th>Ответ</th>
+                                <th>XP</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasksTableBody">
+                            <tr><td colspan="7" class="text-center text-gray-400 py-8">Загрузка...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-gray-100 flex items-center justify-between">
+                    <div id="tasksPagInfo" class="text-sm text-gray-400"></div>
+                    <div id="tasksPagination" class="pagination"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Theory ─────────────────────────────────────── -->
+        <div id="section-theory" class="section">
+            <div class="flex items-center justify-between mb-6">
+                <h1 class="text-2xl font-bold text-gray-800">Теория</h1>
+                <button onclick="openTheoryModal()" class="btn btn-green"><i class="fas fa-plus"></i> Создать</button>
+            </div>
+            <div class="card p-4 mb-4 flex flex-wrap gap-3 items-center">
+                <input id="theoryLessonFilter" type="number" placeholder="ID урока..." class="form-input" style="max-width:140px" oninput="debounce(loadTheory,400)()">
+            </div>
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Урок</th>
+                                <th>Категория</th>
+                                <th>Заголовок</th>
+                                <th>Статус</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="theoryTableBody">
+                            <tr><td colspan="6" class="text-center text-gray-400 py-8">Загрузка...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="p-4 border-t border-gray-100 flex items-center justify-between">
+                    <div id="theoryPagInfo" class="text-sm text-gray-400"></div>
+                    <div id="theoryPagination" class="pagination"></div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- ── Modals ─────────────────────────────────────────────── -->
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-5">
+            <h2 id="modalTitle" class="text-lg font-bold text-gray-800"></h2>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="modalBody"></div>
+        <div class="flex gap-3 justify-end mt-6 pt-4 border-t border-gray-100">
+            <button onclick="closeModal()" class="btn btn-gray">Отмена</button>
+            <button id="modalSaveBtn" class="btn btn-green">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────
+const API = 'http://localhost:8000/v1';
+let token = localStorage.getItem('admin_token') || '';
+let currentSection = 'dashboard';
+
+// Pagination state
+const pag = {
+    users:   { page: 1, total: 0 },
+    lessons: { page: 1, total: 0 },
+    tasks:   { page: 1, total: 0 },
+    theory:  { page: 1, total: 0 },
+};
+
+// ── Auth ──────────────────────────────────────────────────────────
+async function doLogin() {
+    const login = document.getElementById('loginInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    const errEl = document.getElementById('loginError');
+    errEl.classList.add('hidden');
+
+    try {
+        const res = await fetch(`${API}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ login, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail?.error?.message || 'Ошибка входа');
+        if (data.user?.role !== 'admin') throw new Error('Недостаточно прав. Требуется роль admin.');
+
+        token = data.access_token;
+        localStorage.setItem('admin_token', token);
+        localStorage.setItem('admin_user', JSON.stringify(data.user));
+
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminApp').classList.remove('hidden');
+        document.getElementById('adminLabel').textContent = `👤 ${data.user.username}`;
+        loadDashboard();
+    } catch (e) {
+        errEl.textContent = e.message;
+        errEl.classList.remove('hidden');
+    }
+}
+
+function doLogout() {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    token = '';
+    location.reload();
+}
+
+document.getElementById('passwordInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+});
+
+// Check if already logged in
+(function () {
+    if (!token) return;
+    const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
+    if (user.role === 'admin') {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminApp').classList.remove('hidden');
+        document.getElementById('adminLabel').textContent = `👤 ${user.username}`;
+        loadDashboard();
+    }
+})();
+
+// ── Helpers ───────────────────────────────────────────────────────
+async function api(method, path, body) {
+    const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`${API}/admin${path}`, opts);
+    if (res.status === 401) { doLogout(); return null; }
+    if (res.status === 204) return null;
+    return res.json();
+}
+
+function toast(msg, type = 'green') {
+    const el = document.createElement('div');
+    el.className = `toast-item`;
+    el.style.background = type === 'green' ? '#16a34a' : '#dc2626';
+    el.textContent = msg;
+    document.getElementById('toast').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+function debounce(fn, delay) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+function fmtDate(str) {
+    if (!str) return '—';
+    return new Date(str).toLocaleDateString('ru-RU');
+}
+
+function truncate(str, n = 50) {
+    return str && str.length > n ? str.slice(0, n) + '…' : (str || '—');
+}
+
+function renderPagination(containerId, infoId, state, loadFn, pageSize = 20) {
+    const totalPages = Math.ceil(state.total / pageSize) || 1;
+    const info = document.getElementById(infoId);
+    const container = document.getElementById(containerId);
+    info.textContent = `Всего: ${state.total}`;
+    container.innerHTML = '';
+
+    const mkBtn = (label, pg, active) => {
+        const btn = document.createElement('button');
+        btn.className = 'page-btn' + (active ? ' active' : '');
+        btn.innerHTML = label;
+        btn.onclick = () => { state.page = pg; loadFn(); };
+        return btn;
+    };
+
+    if (state.page > 1) container.appendChild(mkBtn('<i class="fas fa-chevron-left text-xs"></i>', state.page - 1, false));
+
+    const start = Math.max(1, state.page - 2);
+    const end   = Math.min(totalPages, state.page + 2);
+    for (let i = start; i <= end; i++) container.appendChild(mkBtn(i, i, i === state.page));
+
+    if (state.page < totalPages) container.appendChild(mkBtn('<i class="fas fa-chevron-right text-xs"></i>', state.page + 1, false));
+}
+
+// ── Section routing ───────────────────────────────────────────────
+const sectionLoaders = {
+    dashboard: loadDashboard,
+    users:     loadUsers,
+    lessons:   loadLessons,
+    tasks:     loadTasks,
+    theory:    loadTheory,
+};
+
+function showSection(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+    document.getElementById(`section-${name}`).classList.add('active');
+    document.getElementById(`nav-${name}`).classList.add('active');
+    currentSection = name;
+    if (sectionLoaders[name]) sectionLoaders[name]();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────
+async function loadDashboard() {
+    const data = await api('GET', '/stats');
+    if (!data) return;
+
+    document.getElementById('stat-users').textContent = data.users.total;
+    document.getElementById('stat-users-sub').textContent = `${data.users.active} активных, ${data.users.verified} верифицированных`;
+    document.getElementById('stat-lessons').textContent = data.content.lessons;
+    document.getElementById('stat-lessons-sub').textContent = `${data.content.published_lessons} опубликованных`;
+    document.getElementById('stat-tasks').textContent = data.content.tasks;
+    document.getElementById('stat-tasks-sub').textContent = `${data.content.theory} теорий`;
+    document.getElementById('stat-xp').textContent = data.activity.total_xp_earned.toLocaleString('ru-RU');
+    document.getElementById('stat-pvp').textContent = `${data.activity.completions} завершений, ${data.activity.pvp_matches} PvP матчей`;
+
+    const topEl = document.getElementById('topUsersList');
+    topEl.innerHTML = data.top_users.map((u, i) => `
+        <div class="flex items-center gap-3">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black ${i === 0 ? 'bg-yellow-100 text-yellow-700' : i === 1 ? 'bg-gray-100 text-gray-600' : 'bg-orange-50 text-orange-600'}">${i + 1}</div>
+            <div class="flex-1">
+                <div class="font-semibold text-sm text-gray-800">@${u.username}</div>
+                <div class="text-xs text-gray-400">${u.league} · Level ${u.level}</div>
+            </div>
+            <div class="text-sm font-bold text-green-600">${u.xp.toLocaleString()} XP</div>
+        </div>
+    `).join('');
+
+    const recentEl = document.getElementById('recentUsersList');
+    recentEl.innerHTML = data.recent_users.map(u => `
+        <div class="flex items-center gap-3 py-1.5 border-b border-gray-50">
+            <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm text-gray-800 truncate">@${u.username}</div>
+                <div class="text-xs text-gray-400 truncate">${u.email}</div>
+            </div>
+            <div class="flex flex-col items-end gap-1">
+                <span class="badge ${u.is_verified ? 'badge-green' : 'badge-yellow'}">${u.is_verified ? 'верифицирован' : 'ожидает'}</span>
+                <div class="text-xs text-gray-400">${fmtDate(u.created_at)}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ── Users ─────────────────────────────────────────────────────────
+async function loadUsers() {
+    const search = document.getElementById('userSearch').value;
+    const role   = document.getElementById('userRoleFilter').value;
+    const active = document.getElementById('userActiveFilter').value;
+    let url = `/users?page=${pag.users.page}&page_size=20`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (role) url += `&role=${role}`;
+    if (active !== '') url += `&is_active=${active}`;
+
+    const data = await api('GET', url);
+    if (!data) return;
+    pag.users.total = data.total;
+
+    const tbody = document.getElementById('usersTableBody');
+    if (!data.items.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">Пусто</td></tr>';
+    } else {
+        tbody.innerHTML = data.items.map(u => `
+            <tr>
+                <td>
+                    <div class="font-semibold text-gray-800">@${u.username}</div>
+                    <div class="text-xs text-gray-400">${u.name}</div>
+                </td>
+                <td class="text-gray-500">${u.email}</td>
+                <td><span class="badge ${u.role === 'admin' ? 'badge-blue' : 'badge-gray'}">${u.role}</span></td>
+                <td>
+                    <div class="font-medium">${u.xp.toLocaleString()} XP</div>
+                    <div class="text-xs text-gray-400">Level ${u.level} · ${u.league}</div>
+                </td>
+                <td>
+                    <span class="badge ${u.is_active ? 'badge-green' : 'badge-red'}">${u.is_active ? 'активен' : 'заблокирован'}</span>
+                    ${!u.is_verified ? '<span class="badge badge-yellow ml-1">не верифицирован</span>' : ''}
+                </td>
+                <td class="text-gray-400">${fmtDate(u.created_at)}</td>
+                <td>
+                    <div class="flex gap-2">
+                        <button onclick="openUserModal('${u.id}')" class="btn btn-outline py-1 px-2 text-xs"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteUser('${u.id}','${u.username}')" class="btn btn-red py-1 px-2 text-xs"><i class="fas fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+    renderPagination('usersPagination', 'usersPagInfo', pag.users, loadUsers);
+}
+
+async function openUserModal(userId) {
+    let user = null;
+    if (userId) {
+        user = await api('GET', `/users/${userId}`);
+        if (!user) return;
+    }
+    const isEdit = !!user;
+    document.getElementById('modalTitle').textContent = isEdit ? `Редактировать @${user.username}` : 'Новый пользователь';
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="grid grid-cols-2 gap-4">
+            <div><label class="form-label">Имя</label><input id="mName" class="form-input" value="${user?.name || ''}"></div>
+            <div><label class="form-label">Username</label><input id="mUsername" class="form-input" value="${user?.username || ''}"></div>
+            <div class="col-span-2"><label class="form-label">Email</label><input id="mEmail" type="email" class="form-input" value="${user?.email || ''}"></div>
+            ${!isEdit ? `<div class="col-span-2"><label class="form-label">Пароль</label><input id="mPassword" type="password" class="form-input"></div>` : ''}
+            <div><label class="form-label">Роль</label>
+                <select id="mRole" class="form-input">
+                    <option value="user" ${user?.role === 'user' ? 'selected' : ''}>user</option>
+                    <option value="admin" ${user?.role === 'admin' ? 'selected' : ''}>admin</option>
+                </select>
+            </div>
+            <div><label class="form-label">Лига</label>
+                <select id="mLeague" class="form-input">
+                    ${['Bronze','Silver','Gold','Platinum','Diamond'].map(l => `<option ${user?.league===l?'selected':''}>${l}</option>`).join('')}
+                </select>
+            </div>
+            <div><label class="form-label">XP</label><input id="mXp" type="number" class="form-input" value="${user?.xp ?? 0}"></div>
+            <div><label class="form-label">Монеты</label><input id="mCoins" type="number" class="form-input" value="${user?.coins ?? 0}"></div>
+            ${isEdit ? `<div class="col-span-2"><label class="form-label">Новый пароль (опц.)</label><input id="mPassword" type="password" class="form-input" placeholder="Оставьте пустым, чтобы не менять"></div>` : ''}
+            <div class="flex items-center gap-2">
+                <input id="mActive" type="checkbox" class="w-4 h-4" ${user?.is_active !== false ? 'checked' : ''}>
+                <label for="mActive" class="form-label mb-0">Активен</label>
+            </div>
+            <div class="flex items-center gap-2">
+                <input id="mVerified" type="checkbox" class="w-4 h-4" ${user?.is_verified ? 'checked' : ''}>
+                <label for="mVerified" class="form-label mb-0">Верифицирован</label>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('modalSaveBtn').onclick = async () => {
+        const payload = {
+            name:        document.getElementById('mName').value,
+            username:    document.getElementById('mUsername').value,
+            email:       document.getElementById('mEmail').value,
+            role:        document.getElementById('mRole').value,
+            league:      document.getElementById('mLeague').value,
+            xp:          parseInt(document.getElementById('mXp').value),
+            coins:       parseInt(document.getElementById('mCoins').value),
+            is_active:   document.getElementById('mActive').checked,
+            is_verified: document.getElementById('mVerified').checked,
+        };
+        const pw = document.getElementById('mPassword')?.value;
+        if (pw) payload.new_password = pw;
+
+        let res;
+        if (isEdit) {
+            res = await api('PATCH', `/users/${userId}`, payload);
+        } else {
+            res = await api('POST', '/users', { ...payload, password: pw });
+        }
+        if (res) { toast(isEdit ? 'Сохранено' : 'Пользователь создан'); closeModal(); loadUsers(); }
+    };
+
+    document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function deleteUser(id, username) {
+    if (!confirm(`Удалить @${username}? Это нельзя отменить.`)) return;
+    await api('DELETE', `/users/${id}`);
+    toast('Пользователь удалён', 'red');
+    loadUsers();
+}
+
+// ── Lessons ───────────────────────────────────────────────────────
+async function loadLessons() {
+    const search    = document.getElementById('lessonSearch').value;
+    const level     = document.getElementById('lessonLevelFilter').value;
+    const published = document.getElementById('lessonPublishedFilter').value;
+    let url = `/lessons?page=${pag.lessons.page}&page_size=20`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (level) url += `&level=${level}`;
+    if (published !== '') url += `&is_published=${published}`;
+
+    const data = await api('GET', url);
+    if (!data) return;
+    pag.lessons.total = data.total;
+
+    const tbody = document.getElementById('lessonsTableBody');
+    if (!data.items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-400 py-8">Пусто</td></tr>';
+    } else {
+        tbody.innerHTML = data.items.map(l => `
+            <tr>
+                <td class="text-gray-400">${l.id}</td>
+                <td>
+                    <div class="font-medium text-gray-800">${l.title}</div>
+                    <div class="text-xs text-gray-400">${l.description ? truncate(l.description, 40) : ''}</div>
+                </td>
+                <td><span class="badge badge-blue">${l.level}</span></td>
+                <td class="text-gray-500 text-xs">${l.section}</td>
+                <td><span class="badge badge-green">${l.xp_reward} XP</span></td>
+                <td class="text-center">${l.task_count}</td>
+                <td><span class="badge ${l.is_published ? 'badge-green' : 'badge-yellow'}">${l.is_published ? 'опубликован' : 'черновик'}</span></td>
+                <td>
+                    <div class="flex gap-2">
+                        <button onclick="openLessonModal(${l.id})" class="btn btn-outline py-1 px-2 text-xs"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteLesson(${l.id},'${l.title}')" class="btn btn-red py-1 px-2 text-xs"><i class="fas fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+    renderPagination('lessonsPagination', 'lessonsPagInfo', pag.lessons, loadLessons);
+}
+
+async function openLessonModal(lessonId) {
+    let lesson = null;
+    if (lessonId) {
+        lesson = await api('GET', `/lessons/${lessonId}`);
+        if (!lesson) return;
+    }
+    const isEdit = !!lesson;
+    document.getElementById('modalTitle').textContent = isEdit ? `Редактировать урок #${lesson.id}` : 'Новый урок';
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="space-y-4">
+            <div><label class="form-label">Название</label><input id="lTitle" class="form-input" value="${lesson?.title || ''}"></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="form-label">Уровень</label>
+                    <select id="lLevel" class="form-input">
+                        ${['A1','A2','B1','B2','C1'].map(v=>`<option ${lesson?.level===v?'selected':''}>${v}</option>`).join('')}
+                    </select>
+                </div>
+                <div><label class="form-label">XP награда</label><input id="lXp" type="number" class="form-input" value="${lesson?.xp_reward ?? 20}"></div>
+            </div>
+            <div><label class="form-label">Секция</label><input id="lSection" class="form-input" value="${lesson?.section || 'Beginner'}"></div>
+            <div><label class="form-label">Описание</label><textarea id="lDesc" class="form-input" rows="2">${lesson?.description || ''}</textarea></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="form-label">Порядок</label><input id="lOrder" type="number" class="form-input" value="${lesson?.order_index ?? 0}"></div>
+                <div class="flex items-center gap-2 mt-6">
+                    <input id="lPublished" type="checkbox" class="w-4 h-4" ${lesson?.is_published !== false ? 'checked' : ''}>
+                    <label for="lPublished" class="form-label mb-0">Опубликован</label>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('modalSaveBtn').onclick = async () => {
+        const payload = {
+            title:        document.getElementById('lTitle').value,
+            level:        document.getElementById('lLevel').value,
+            section:      document.getElementById('lSection').value,
+            xp_reward:    parseInt(document.getElementById('lXp').value),
+            description:  document.getElementById('lDesc').value || null,
+            order_index:  parseInt(document.getElementById('lOrder').value),
+            is_published: document.getElementById('lPublished').checked,
+        };
+        const res = isEdit
+            ? await api('PATCH', `/lessons/${lessonId}`, payload)
+            : await api('POST', '/lessons', payload);
+        if (res !== undefined) { toast(isEdit ? 'Урок обновлён' : 'Урок создан'); closeModal(); loadLessons(); }
+    };
+
+    document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function deleteLesson(id, title) {
+    if (!confirm(`Удалить урок "${title}"? Все задания и теория тоже удалятся.`)) return;
+    await api('DELETE', `/lessons/${id}`);
+    toast('Урок удалён', 'red');
+    loadLessons();
+}
+
+// ── Tasks ─────────────────────────────────────────────────────────
+async function loadTasks() {
+    const lessonId = document.getElementById('taskLessonFilter').value;
+    const type     = document.getElementById('taskTypeFilter').value;
+    let url = `/tasks?page=${pag.tasks.page}&page_size=20`;
+    if (lessonId) url += `&lesson_id=${lessonId}`;
+    if (type) url += `&task_type=${type}`;
+
+    const data = await api('GET', url);
+    if (!data) return;
+    pag.tasks.total = data.total;
+
+    const tbody = document.getElementById('tasksTableBody');
+    const typeColors = { translate:'badge-blue', choice:'badge-green', fill:'badge-yellow', matching:'badge-gray', speaking:'badge-blue', listening:'badge-blue' };
+    if (!data.items.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400 py-8">Пусто</td></tr>';
+    } else {
+        tbody.innerHTML = data.items.map(t => `
+            <tr>
+                <td class="text-gray-400">${t.id}</td>
+                <td class="text-gray-500">#${t.lesson_id}</td>
+                <td><span class="badge ${typeColors[t.task_type]||'badge-gray'}">${t.task_type}</span></td>
+                <td class="max-w-xs"><div class="truncate">${truncate(t.prompt, 60)}</div></td>
+                <td class="text-gray-500">${truncate(t.answer, 30)}</td>
+                <td><span class="badge badge-green">${t.xp_reward}</span></td>
+                <td>
+                    <div class="flex gap-2">
+                        <button onclick="openTaskModal(${t.id})" class="btn btn-outline py-1 px-2 text-xs"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteTask(${t.id})" class="btn btn-red py-1 px-2 text-xs"><i class="fas fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+    renderPagination('tasksPagination', 'tasksPagInfo', pag.tasks, loadTasks);
+}
+
+async function openTaskModal(taskId) {
+    let task = null;
+    if (taskId) {
+        const data = await api('GET', `/tasks?page=1&page_size=1`); // fetch via list won't work — need direct
+        // We'll use a trick: fetch from full list to find by id
+        const all = await api('GET', `/tasks?page=1&page_size=1000`);
+        task = all?.items?.find(t => t.id === taskId);
+    }
+    const isEdit = !!task;
+    document.getElementById('modalTitle').textContent = isEdit ? `Редактировать задание #${task.id}` : 'Новое задание';
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="form-label">ID Урока</label><input id="tLessonId" type="number" class="form-input" value="${task?.lesson_id || ''}"></div>
+                <div><label class="form-label">Тип задания</label>
+                    <select id="tType" class="form-input">
+                        ${['translate','choice','fill','matching','speaking','listening'].map(v=>`<option ${task?.task_type===v?'selected':''}>${v}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div><label class="form-label">Вопрос / Подсказка</label><textarea id="tPrompt" class="form-input" rows="3">${task?.prompt || ''}</textarea></div>
+            <div><label class="form-label">Правильный ответ</label><input id="tAnswer" class="form-input" value="${task?.answer || ''}"></div>
+            <div><label class="form-label">Варианты (JSON, для choice)</label><input id="tOptions" class="form-input" value="${task?.options || ''}" placeholder='["goes","go","going","gone"]'></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="form-label">XP</label><input id="tXp" type="number" class="form-input" value="${task?.xp_reward ?? 5}"></div>
+                <div><label class="form-label">Порядок</label><input id="tOrder" type="number" class="form-input" value="${task?.order_index ?? 0}"></div>
+            </div>
+            <div><label class="form-label">Объяснение (при ошибке)</label><textarea id="tExpl" class="form-input" rows="2">${task?.explanation || ''}</textarea></div>
+        </div>
+    `;
+
+    document.getElementById('modalSaveBtn').onclick = async () => {
+        const payload = {
+            lesson_id:   parseInt(document.getElementById('tLessonId').value),
+            task_type:   document.getElementById('tType').value,
+            prompt:      document.getElementById('tPrompt').value,
+            answer:      document.getElementById('tAnswer').value,
+            options:     document.getElementById('tOptions').value || null,
+            xp_reward:   parseInt(document.getElementById('tXp').value),
+            order_index: parseInt(document.getElementById('tOrder').value),
+            explanation: document.getElementById('tExpl').value || null,
+        };
+        const res = isEdit
+            ? await api('PATCH', `/tasks/${taskId}`, payload)
+            : await api('POST', '/tasks', payload);
+        if (res !== undefined) { toast(isEdit ? 'Задание обновлено' : 'Задание создано'); closeModal(); loadTasks(); }
+    };
+
+    document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function deleteTask(id) {
+    if (!confirm(`Удалить задание #${id}?`)) return;
+    await api('DELETE', `/tasks/${id}`);
+    toast('Задание удалено', 'red');
+    loadTasks();
+}
+
+// ── Theory ────────────────────────────────────────────────────────
+async function loadTheory() {
+    const lessonId = document.getElementById('theoryLessonFilter').value;
+    let url = `/theory?page=${pag.theory.page}&page_size=20`;
+    if (lessonId) url += `&lesson_id=${lessonId}`;
+
+    const data = await api('GET', url);
+    if (!data) return;
+    pag.theory.total = data.total;
+
+    const tbody = document.getElementById('theoryTableBody');
+    if (!data.items.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-8">Пусто</td></tr>';
+    } else {
+        tbody.innerHTML = data.items.map(t => `
+            <tr>
+                <td class="text-gray-400">${t.id}</td>
+                <td class="text-gray-500">${t.lesson_id ? '#'+t.lesson_id : '—'}</td>
+                <td><span class="badge badge-gray">${t.category}</span></td>
+                <td class="font-medium text-gray-800">${truncate(t.title, 50)}</td>
+                <td><span class="badge ${t.is_published ? 'badge-green' : 'badge-yellow'}">${t.is_published ? 'опубл.' : 'черновик'}</span></td>
+                <td>
+                    <div class="flex gap-2">
+                        <button onclick="openTheoryModal(${t.id})" class="btn btn-outline py-1 px-2 text-xs"><i class="fas fa-pen"></i></button>
+                        <button onclick="deleteTheory(${t.id})" class="btn btn-red py-1 px-2 text-xs"><i class="fas fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+    renderPagination('theoryPagination', 'theoryPagInfo', pag.theory, loadTheory);
+}
+
+async function openTheoryModal(theoryId) {
+    let theory = null;
+    if (theoryId) {
+        const all = await api('GET', `/theory?page=1&page_size=1000`);
+        theory = all?.items?.find(t => t.id === theoryId);
+    }
+    const isEdit = !!theory;
+    document.getElementById('modalTitle').textContent = isEdit ? `Редактировать теорию #${theory.id}` : 'Новая теория';
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="form-label">ID Урока (опц.)</label><input id="thLesson" type="number" class="form-input" value="${theory?.lesson_id || ''}"></div>
+                <div><label class="form-label">Категория</label><input id="thCat" class="form-input" value="${theory?.category || ''}"></div>
+            </div>
+            <div><label class="form-label">Заголовок</label><input id="thTitle" class="form-input" value="${theory?.title || ''}"></div>
+            <div><label class="form-label">Содержание</label><textarea id="thContent" class="form-input" rows="4">${theory?.content || ''}</textarea></div>
+            <div><label class="form-label">Примеры</label><textarea id="thExamples" class="form-input" rows="2">${theory?.examples || ''}</textarea></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="form-label">Порядок</label><input id="thOrder" type="number" class="form-input" value="${theory?.order_index ?? 0}"></div>
+                <div class="flex items-center gap-2 mt-6">
+                    <input id="thPublished" type="checkbox" class="w-4 h-4" ${theory?.is_published !== false ? 'checked' : ''}>
+                    <label for="thPublished" class="form-label mb-0">Опубликована</label>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('modalSaveBtn').onclick = async () => {
+        const lessonVal = document.getElementById('thLesson').value;
+        const payload = {
+            lesson_id:   lessonVal ? parseInt(lessonVal) : null,
+            category:    document.getElementById('thCat').value,
+            title:       document.getElementById('thTitle').value,
+            content:     document.getElementById('thContent').value,
+            examples:    document.getElementById('thExamples').value,
+            order_index: parseInt(document.getElementById('thOrder').value),
+            is_published: document.getElementById('thPublished').checked,
+        };
+        const res = isEdit
+            ? await api('PATCH', `/theory/${theoryId}`, payload)
+            : await api('POST', '/theory', payload);
+        if (res !== undefined) { toast(isEdit ? 'Теория обновлена' : 'Теория создана'); closeModal(); loadTheory(); }
+    };
+
+    document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function deleteTheory(id) {
+    if (!confirm(`Удалить теорию #${id}?`)) return;
+    await api('DELETE', `/theory/${id}`);
+    toast('Теория удалена', 'red');
+    loadTheory();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.add('hidden');
+}
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 //  Full version: Auth + Lessons (translate/choice/fill) + Theory API + Profile
 // ============================================================
 
-const API_BASE = "https://5bb7-95-87-64-99.ngrok-free.app/";
+const API_BASE = "http://localhost:8000/v1";
 // http://localhost:8000/v1
 // ── Global state ──────────────────────────────────────────────
 let currentUser        = JSON.parse(localStorage.getItem("tilzone_user"))       || null;
