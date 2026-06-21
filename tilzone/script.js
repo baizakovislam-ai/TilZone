@@ -426,7 +426,7 @@ async function loadLearningPath() {
     setElText("dailyProgress", `${completed} / ${total}`);
     setElStyle("dailyBar","width", total ? `${(completed/total)*100}%` : "0%");
   } catch {
-    container.innerHTML = `<p class="text-center text-gray-400 py-8">Уроктарды жүктөө мүмкүн болгон жок. Сервер иштеп жатабы?</p>`;
+    container.innerHTML = `<p class="text-center text-gray-400 py-8">Сабактарды жүктөө мүмкүн болгон жок. Сервер иштеп жатабы?</p>`;
   }
 }
 

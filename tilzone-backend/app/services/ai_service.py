@@ -14,6 +14,7 @@ Production-level AI service for chat.
 - Fail-safe парсинг JSON
 """
 
+import re
 import json
 import logging
 import asyncio
@@ -73,45 +74,67 @@ def get_groq_client() -> OpenAI:
 def _parse_ai_response(raw_text: str) -> dict[str, Any]:
     """
     Безопасный парсинг ответа AI.
-
-    Модель может вернуть:
-    - markdown ```json
-    - невалидный JSON
-    - обычный текст
+    Защищен от:
+    - Тегов <think>...</think> (DeepSeek, Qwen)
+    - Markdown обёрток ```json ... ```
+    - Мусора до и после JSON
     """
+    default_response = {
+        "thoughts": "",
+        "response": "⚠️ I didn't catch that. Could you repeat?",
+        "correction": None,
+        "level_hint": "A1",
+    }
 
     if not raw_text:
-        return {
-            "response": "⚠️ Empty response from AI",
-            "correction": None,
-            "level_hint": "A1",
-        }
+        return default_response
 
-    text = raw_text.strip()
+    # 1. Убираем теги <think>...</think> (для "мыслящих" моделей)
+    text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL | re.IGNORECASE).strip()
 
-    if text.startswith("```"):
-        lines = text.split("\n")
+    # 2. Убираем markdown обёртки ```json ... ```
+    text = text.replace('```json', '').replace('```', '').strip()
 
-        if len(lines) > 2:
-            text = "\n".join(lines[1:-1])
+    # 3. Ищем границы валидного JSON (первая { и последняя })
+    start = text.find('{')
+    end = text.rfind('}')
+    
+    if start != -1 and end != -1 and end > start:
+        text = text[start:end+1]
+    else:
+        logger.warning("AI returned text without JSON boundaries: %s", raw_text[:100])
+        # Пытаемся спасти хотя бы текст ответа через regex
+        match = re.search(r'"response"\s*:\s*"((?:\\.|[^"\\])*)"', raw_text)
+        if match:
+            return {
+                "thoughts": "",
+                "response": match.group(1).strip(),
+                "correction": None,
+                "level_hint": "A1",
+            }
+        return default_response
 
+    # 4. Парсим JSON
     try:
         data = json.loads(text)
-
         return {
+            "thoughts": str(data.get("thoughts", "")).strip(),
             "response": str(data.get("response", "")).strip(),
             "correction": data.get("correction"),
             "level_hint": str(data.get("level_hint", "A1")),
         }
-
-    except Exception:
-        logger.warning("AI returned non-JSON response")
-
-        return {
-            "response": text,
-            "correction": None,
-            "level_hint": "A1",
-        }
+    except json.JSONDecodeError as e:
+        logger.warning("Failed to parse AI JSON: %s | Raw: %s", str(e), text[:200])
+        # Fallback: пытаемся вытащить response через regex, если json.loads упал
+        match = re.search(r'"response"\s*:\s*"((?:\\.|[^"\\])*)"', raw_text)
+        if match:
+            return {
+                "thoughts": "",
+                "response": match.group(1).strip(),
+                "correction": None,
+                "level_hint": "A1",
+            }
+        return default_response
 
 
 # =========================
